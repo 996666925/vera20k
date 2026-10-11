@@ -713,6 +713,25 @@ pub struct GameEntity {
     /// `gattling`.
     #[serde(default = "default_last_fire_frame")]
     pub last_fire_frame: i64,
+    /// Turret rotation-sound latch — `TechnoClass+0x49C`. It holds the
+    /// inverse of the last reached turret-control visit's sample (`+0x4A0`),
+    /// except when constructor/Unlimbo/Limbo initialization arms it. It is
+    /// `true` when the next rotating visit must request a loop. It tracks
+    /// the rotation edge even when the cue is absent or inaudible, and Load
+    /// retains it while reconstructing the external handle.
+    /// `TechnoClass::Unlimbo`'s type-derived initialization arms it
+    /// (the block that copies type fields to the instance), as do the
+    /// constructor (`0x006F30D6`) and the `TechnoClass::Limbo` sound cleanup
+    /// (reference/Steam `0x006F6C5B`). Written by
+    /// [`crate::sim::world::turret_rotate_sound`] only, for a `Turret=yes`
+    /// building.
+    ///
+    /// Folded into `world_hash` only while unarmed: the latch retains control
+    /// history that no other folded field reproduces. It does not indicate
+    /// successful playback. The armed default folds nothing so an object that
+    /// never turned keeps its prior hash stream.
+    #[serde(default = "default_true")]
+    pub turret_rotate_latch: bool,
     /// The rearm countdown (`TechnoClass+0x2EC`, a CDTimerClass whose
     /// duration is `+0x2F4`). It belongs to the object, not to its target:
     /// `Assign_Target @ 0x006FCDB0` never touches it, so a new target does not
@@ -1629,6 +1648,8 @@ impl GameEntity {
             },
             // The Unlimbo direction; the class constructor supplies the rate.
             body_facing: crate::sim::movement::FacingClass::new(u16::from(facing) << 8, 0),
+            // Unlimbo's type-derived initialization arms the turret loop latch.
+            turret_rotate_latch: true,
             barrel_elevation: crate::sim::movement::FacingClass::new(0, BARREL_ELEVATION_ROT),
             body_frame_counter: 0,
             owner,

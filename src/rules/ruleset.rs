@@ -3861,6 +3861,11 @@ impl RuleSet {
                 section.and_then(|section| sounds.read_rules_reference(section, "SinkingSound"));
             object.voice_sinking =
                 section.and_then(|section| sounds.read_rules_reference(section, "VoiceSinking"));
+            // TechnoType7133BA reads TurretRotateSound (+0x560) through
+            // ReadString128 and Voc7514D0 for every techno type; the key is not
+            // category-gated even though only buildings consume it.
+            object.turret_rotate_sound = section
+                .and_then(|section| sounds.read_rules_reference(section, "TurretRotateSound"));
             if object.category == crate::rules::object_type::ObjectCategory::Infantry {
                 // Infantry52440B then524447: missing/empty/unregistered names
                 // keep the prior signed ID across the existing processed passes.

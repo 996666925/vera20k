@@ -149,6 +149,13 @@ there are a separate residual, not a claim of complete input-query purity.
 
 These generators now default to **read-only checks**, also spelled `--check`:
 
+`python -m tools.spatial_oracle.turret_rotate_sound --check` executes Building
+rotation sampling, Techno start/continued-turn/idle controls and Limbo sound
+cleanup on the supported historical/Steam layout. Rust consumes the corpus in
+`sim::world::turret_rotate_sound::tests`. Audio is device-disabled: accepted
+playback, source retention, audio RNG, attack/decay and whole native Load are not
+covered. The metadata records the executed binary, command and supplied type getter.
+
 | Python module | Sampled native behavior | Rust consumer/test location |
 | --- | --- | --- |
 | `tools.rmg_oracle.gen_rng_vectors` | Seeded state and 16 draws for five seeds | `src/map/rmg/rng.rs` |

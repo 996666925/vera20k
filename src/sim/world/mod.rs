@@ -61,6 +61,7 @@ mod load_object_lifecycle;
 mod logic_vector;
 mod move_cell_input;
 mod move_sound;
+mod turret_rotate_sound;
 pub(crate) use move_sound::MoveSoundState;
 #[cfg(test)]
 mod main_sound_identity_tests;
@@ -3498,6 +3499,15 @@ impl Simulation {
         // `TechnoClass::AI_Update` re-drives a gattling type's loop at its
         // Location every frame (`0x006F9E76..0x006F9EA8`).
         if let Some(techno) = crate::sim::combat::gattling::gattling_sound_techno(id) {
+            return self
+                .substrate
+                .entities
+                .get(techno)
+                .map(Self::movement_sound_world);
+        }
+        // The same per-visit re-drive for a building's turret rotation loop on
+        // its `+0x488` handle (`0x006FA04F`).
+        if let Some(techno) = turret_rotate_sound::turret_rotate_sound_techno(id) {
             return self
                 .substrate
                 .entities

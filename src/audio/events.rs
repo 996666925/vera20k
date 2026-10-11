@@ -549,9 +549,16 @@ impl GameSoundEvent {
 /// `Dummy` both register. Downstream risk: none; closing it means resolving
 /// the name against the sound registry, which lives above `rules/`.
 ///
+/// **Partly closed.** `TurretRotateSound=` is landed: the building update's
+/// rotation sample and the `TechnoClass::AI_Update` block drive the type's own
+/// `VocClass` index on the object's `+0x488` handle through the same
+/// owner-keyed path (`sim::world::turret_rotate_sound`), so a stock Grand
+/// Cannon or Yuri Bust sustains its rotate loop while the turret turns and
+/// decays it when it stops.
+///
 /// **Still absent.** Nothing emits the other ambient families:
-/// `WorkingSound=` (9 stock), `AuxSound1=` (8), `AuxSound2=` (5),
-/// `TurretRotateSound=` (2) and the water enter/leave pair have no producer.
+/// `WorkingSound=` (9 stock), `AuxSound1=` (8), `AuxSound2=` (5) and the water
+/// enter/leave pair have no producer.
 /// - Player effect: the soundscape is still thin — bases have no working hum.
 /// - Frequency: continuous.
 /// - Downstream risk: none left on the audio side. Each remaining family needs

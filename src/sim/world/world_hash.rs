@@ -1856,6 +1856,13 @@ impl Simulation {
                 0x140_u32.hash(hasher);
                 entity.gattling.hash(hasher);
             }
+            // Turret rotation-sound latch (`+0x49C`): unarmed suppresses another
+            // playback request until idle, even if no source exists. No other
+            // folded field reproduces that history. The armed default folds
+            // nothing, so a building that never turned keeps its prior hash stream.
+            if !entity.turret_rotate_latch {
+                b"turret-rotate-latch-v1".hash(hasher);
+            }
             // Retired slot: the entity homing model had no production creator
             // and is gone; its constant absent tag keeps pinned hashes stable.
             0u8.hash(hasher);

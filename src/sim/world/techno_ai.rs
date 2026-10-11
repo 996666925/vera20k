@@ -640,9 +640,15 @@ fn techno_ai_shell(
     // its damage fire at 0x0043FC39, 0x0043FCF9) and a warped object returns
     // before the common Techno body. VERA's object turn then skips its
     // locomotor for the same reason.
+    // `BuildingClass::Update`'s turret-rotation sample
+    // (reference/Steam `0x0043FCC7..0x0043FCF9`) is taken after damage fire,
+    // before `TemporalClass::Update` and the `TechnoClass::AI_Update` call at
+    // `0x0043FE56`, whose early block consumes it. Only a structure writes it.
+    let mut turret_rotate_sample = false;
     if let Some(rules) = rules {
         if category == EntityCategory::Structure {
             sim.update_building_damage_fire(id, rules);
+            turret_rotate_sample = sim.sample_building_turret_rotation(id, rules);
         }
         if sim.temporal_ai_prologue(id, rules, ctx, &mut outcome.bridge_state_changed) {
             return;
@@ -695,7 +701,7 @@ fn techno_ai_shell(
         // The supported Foot mission cadence branches run here as well.
         EntityCategory::Infantry => {
             if let Some(rules) = rules
-                && !techno_common_steps(sim, id, rules, ctx.overlay_registry, ctx.effects)
+                && !techno_common_steps(sim, id, rules, ctx.overlay_registry, ctx.effects, None)
             {
                 return;
             }
@@ -742,7 +748,14 @@ fn techno_ai_shell(
             // The ready check after UpdateAnimation (`0x0043FE27`).
             building_missions::ready_commence(sim, id, true);
             if let Some(rules) = rules
-                && !techno_common_steps(sim, id, rules, ctx.overlay_registry, ctx.effects)
+                && !techno_common_steps(
+                    sim,
+                    id,
+                    rules,
+                    ctx.overlay_registry,
+                    ctx.effects,
+                    Some(turret_rotate_sample),
+                )
             {
                 return;
             }
@@ -868,7 +881,7 @@ fn techno_ai_shell(
         EntityCategory::Aircraft => {
             drop_unsensed_cloaked_target_step(sim, id);
             if let Some(rules) = rules
-                && !techno_common_steps(sim, id, rules, ctx.overlay_registry, ctx.effects)
+                && !techno_common_steps(sim, id, rules, ctx.overlay_registry, ctx.effects, None)
             {
                 return;
             }
@@ -1255,12 +1268,18 @@ fn techno_common_steps(
     rules: &RuleSet,
     overlay_registry: Option<&OverlayTypeRegistry>,
     effects: FrameEffects<'_>,
+    turret_rotate_sample: Option<bool>,
 ) -> bool {
     iron_tint_step(sim, id);
     // Techno6F9EBB follows the tint head and precedes veterancy/drain work.
     // A queued voice probes its handle only when this actor really reaches
     // this slot; recording final Logic membership would lose early exits.
     sim.record_unit_voice_visit(id);
+    // Techno6F9FA9 follows the voice head and precedes promotion6FA054.
+    // Building Update froze this sample before Temporal and its common AI.
+    if let Some(sample) = turret_rotate_sample {
+        sim.visit_turret_rotate_sound(id, sample, rules, effects);
+    }
     veterancy_promotion_step(sim, id, rules);
     crate::sim::credit_income::drain_common_step(sim, id, rules);
     allied_target_drop_step(sim, id, rules);
@@ -1651,7 +1670,7 @@ fn techno_common_pre(
     // `AI_Update` order: the promotion sample and the self-heal pulse both
     // precede the cloak tick (`vtable+0x410` at `0x006FA946`), so a same-frame
     // heal is visible to the cloak's health branch.
-    if !techno_common_steps(sim, id, rules, overlay_registry, effects) {
+    if !techno_common_steps(sim, id, rules, overlay_registry, effects, None) {
         return;
     }
     super::techno_ai_cloak::tick_stock_cloak_producer(sim, id, rules, overlay_registry, effects);

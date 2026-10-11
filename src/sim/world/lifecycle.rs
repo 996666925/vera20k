@@ -2814,6 +2814,10 @@ impl Simulation {
         // still reaches ObjectClass::Conceal for a stored dead object; the
         // latter's InLimbo branch alone decides whether Conceal is a no-op.
         self.clear_building_base_reservation_and_repair(stable_id, context);
+        // The same TechnoClass::Limbo sound cleanup releases the turret
+        // rotation loop's `+0x488` handle before the gattling report handle,
+        // and re-arms its latch.
+        self.turret_rotate_sound_limbo(stable_id, context.effects(), context.rules());
         // TechnoClass::Limbo releases the gattling loop and clears the report
         // latch (`0x006F6C6B`, `0x006F6C76`) ahead of its radio pass.
         self.gattling_limbo(stable_id, context);
@@ -4484,6 +4488,10 @@ impl Simulation {
             //(+6A0) before the delegated Techno destructor removes tracking.
             self.sound_events
                 .push(super::SimSoundEvent::ObjectSoundReleased { owner: stable_id });
+            // The delegated Techno destructor also tears down the turret
+            // rotation loop's `+0x488` handle; this object's own UnInit Limbo
+            // released it already, and a structure that never limbos never
+            // started a loop, so no second event is published here.
             // Building43BD67 broadcasts removed=true after sound release,
             // even when a limbo object never reached UnInit. The original
             // constructed-cancel controls execute this under Factory's

@@ -930,7 +930,10 @@ use crate::sim::world::Simulation;
 // Prior bincode records lack them.
 // 323 -> 324: the latches add +0x690, and a garrison's occupants are kept in
 // admission order. Prior records lack the latch and hold occupants reversed.
-const SNAPSHOT_VERSION: u32 = 324;
+// 324 -> 325: each entity retains the turret rotation-sound control latch
+// (TechnoClass+0x49C). Load reconstructs the external handle but retains the
+// saved latch; version 324 records lack this field.
+const SNAPSHOT_VERSION: u32 = 325;
 
 const SNAPSHOT_PRODUCT_MAGIC: [u8; 8] = *b"VERA20K\0";
 const SNAPSHOT_ENVELOPE_VERSION: u32 = 1;
@@ -3985,7 +3988,8 @@ mod tests {
         // 321 -> 322: campaign Session and complete House initialization state.
         // 322 -> 323: the Foot building-entry latches.
         // 323 -> 324: the +0x690 latch and garrison admission order.
-        assert_eq!(super::SNAPSHOT_VERSION, 324);
+        // 324 -> 325: each entity's turret rotation-sound control latch.
+        assert_eq!(super::SNAPSHOT_VERSION, 325);
     }
 
     #[test]
