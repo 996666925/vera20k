@@ -15,6 +15,93 @@ use serde_json::{Value, json};
 const OWNER: u64 = 1;
 const BLOCKER: u64 = 4;
 
+///705D60 is called by Fly Begin_Landing4CFA87 and the Jumpjet arrival
+///transitions54BE2F/54C28C. Exercise those hosts through real frame work.
+#[test]
+fn fly_and_jumpjet_planned_move_legs_progress_through_native_arrival() {
+    use crate::sim::command::{Command, CommandEnvelope};
+    for name in ["HORNET", "JUMPJET"] {
+        let (mut sim, rules, registry) =
+            crate::sim::world::entry_test_fixture::fixture_with_rules("");
+        let owner = sim.interner.intern("Americans");
+        sim.houses.insert(
+            owner,
+            crate::sim::house_state::HouseState::new(owner, 0, None, true, 0, 10),
+        );
+        sim.session.house_order = vec![owner];
+        sim.session.current_house = Some(owner);
+        // Ordinary skirmish paths: Aircraft4196B0's campaign shroud gate
+        // must not reject this fixture's initially unexplored spawn cell.
+        sim.session.game_mode_nonzero = true;
+        // This route fixture has no base; keep its house alive while its
+        // aircraft execute the path instead of triggering ShortGame defeat.
+        sim.session.game_options.short_game = false;
+        let actor = sim
+            .spawn_object_with_overlay_registry(name, "Americans", 15, 15, 0, &rules, &registry)
+            .unwrap();
+        for target_rx in [18, 21] {
+            let record = sim
+                .encode_planning_order_record(
+                    owner,
+                    &Command::Move {
+                        entity_id: actor,
+                        target_rx,
+                        target_ry: 15,
+                    },
+                )
+                .unwrap();
+            let envelope = sim
+                .decode_native_command_record(&record, sim.session.tick)
+                .unwrap();
+            assert!(sim.apply_command("Americans", &envelope.payload, Some(&rules)));
+        }
+        let record = sim.encode_plan_commit_record(owner).unwrap();
+        let commit = CommandEnvelope::new(
+            owner,
+            sim.session.tick + 1,
+            Command::PlanningRecord { record },
+        );
+        let grid = sim.path_grid.clone();
+        sim.advance_tick(
+            &[commit],
+            Some(&rules),
+            grid.as_deref(),
+            Some(&registry),
+            67,
+        );
+        let mut saw_first = false;
+        let mut finished = false;
+        for _ in 0..1200 {
+            let due = sim.take_due_commands();
+            sim.advance_tick(&due, Some(&rules), grid.as_deref(), Some(&registry), 67);
+            let entity = sim.substrate.entities.get(actor).unwrap();
+            saw_first |=
+                entity.position.rx().abs_diff(18) <= 1 && entity.position.ry().abs_diff(15) <= 1;
+            if entity.position.rx().abs_diff(21) <= 1
+                && entity.position.ry().abs_diff(15) <= 1
+                && sim.planning_paths(owner).is_empty()
+            {
+                finished = true;
+                break;
+            }
+        }
+        assert!(
+            saw_first,
+            "{name}: production movement visits the first leg; position={:?}, plans={:?}, queued={:?}",
+            sim.substrate
+                .entities
+                .get(actor)
+                .map(|entity| entity.position),
+            sim.planning_paths(owner),
+            sim.pending_command_snapshot(),
+        );
+        assert!(
+            finished,
+            "{name}: native arrival starts and completes the second leg"
+        );
+    }
+}
+
 fn vectors() -> Value {
     serde_json::from_str(crate::test_fixture::text(
         "tools/spatial_oracle/aircraft_move.json",

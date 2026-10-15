@@ -1052,7 +1052,12 @@ impl TacticalCaptureSession {
             && !state.diagnostic_gui_visible()
             && state.match_state.input.targeting_mode.is_none()
             && state.match_state.input.building_placement_preview.is_none()
-            && state.match_state.input.keys_held.is_empty()
+            && state
+                .match_state
+                .input
+                .keys_held
+                .iter()
+                .all(|key| state.match_state.input.planning.owns_key(*key))
             && !state.match_state.input.minimap_dragging
             && !state
                 .match_state

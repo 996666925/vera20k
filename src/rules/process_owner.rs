@@ -26,6 +26,10 @@ mod turret_rotate_sound_tests;
 #[path = "selection_voice_tests.rs"]
 mod selection_voice_tests;
 
+#[cfg(test)]
+#[path = "planning_rules_tests.rs"]
+mod planning_rules_tests;
+
 use std::sync::Arc;
 
 use crate::rules::error::RulesError;

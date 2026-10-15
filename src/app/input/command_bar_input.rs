@@ -12,6 +12,17 @@ pub(super) fn sync(state: &mut AppState) {
     let frame = state.sidebar_frame();
     let gadgets = &mut state.match_state.match_presentation.in_game_gadgets;
     sync_prepared(gadgets, layout.as_ref(), closed, frame);
+    sync_planning_button(gadgets, state.match_state.input.planning.active());
+}
+
+fn sync_planning_button(gadgets: &mut InGameGadgets, active: bool) {
+    if let Some(handles) = gadgets.command_bar
+        && let Some(gadget) = gadgets.list.get_mut(handles[9])
+        && let GadgetBehavior::Button(mut button) = gadget.behavior
+    {
+        button.is_on = active;
+        gadget.behavior = GadgetBehavior::Button(button);
+    }
 }
 
 fn sync_prepared(
@@ -75,7 +86,7 @@ pub(super) fn apply(state: &mut AppState, result: u16) -> bool {
         return false;
     }
     // Original6D0660 routes these IDs by command identity. Existing action
-    // owners retain gameplay authority; unsupported Planning/Beacon/Cheer
+    // owners retain gameplay authority; unsupported Beacon/Cheer
     // mechanics remain the same explicit residual as their keyboard commands.
     crate::app::input::dispatch::dispatch_command_bar(
         state,
@@ -104,6 +115,69 @@ pub(super) fn publish(state: &mut AppState) {
 mod tests {
     use super::*;
     use crate::ui::sidebar::command_bar::CommandBarLayout;
+
+    #[test]
+    fn planning_flip_uses_real_release_and_authoritative_projection() {
+        let layout =
+            CommandBarLayout::new([800, 600], 168, [28, 32], [52, 32], [28, 32], true).unwrap();
+        let mut gadgets = InGameGadgets::new();
+        sync_prepared(
+            &mut gadgets,
+            Some(&(layout.clone(), vec![Some(9)])),
+            false,
+            sidebar::SidebarFrame::native(800, 600),
+        );
+        let handle = gadgets.command_bar.unwrap()[9];
+        let rect = gadgets.list.get(handle).unwrap().rect;
+        let input = |key, held| GadgetInput {
+            queued_key: key,
+            event_x: rect.x + 1,
+            event_y: rect.y + 1,
+            mouse_x: rect.x + 1,
+            mouse_y: rect.y + 1,
+            left_held: held,
+            ..Default::default()
+        };
+        tick(
+            &mut gadgets.list,
+            &mut gadgets.focus,
+            &GadgetInput::default(),
+            &mut gadgets.out,
+        );
+        assert_eq!(
+            tick(
+                &mut gadgets.list,
+                &mut gadgets.focus,
+                &input(KEY_LMB_DOWN, true),
+                &mut gadgets.out
+            ),
+            0
+        );
+        assert!(
+            matches!(gadgets.list.get(handle).unwrap().behavior, GadgetBehavior::Button(button) if !button.is_on)
+        );
+        assert_eq!(
+            tick(
+                &mut gadgets.list,
+                &mut gadgets.focus,
+                &input(KEY_LMB_UP, false),
+                &mut gadgets.out
+            ),
+            0x80DF
+        );
+        assert!(
+            matches!(gadgets.list.get(handle).unwrap().behavior, GadgetBehavior::Button(button) if button.is_on)
+        );
+        // Keyboard release can clear the mode independently of this gadget.
+        sync_planning_button(&mut gadgets, false);
+        assert!(
+            matches!(gadgets.list.get(handle).unwrap().behavior, GadgetBehavior::Button(button) if !button.is_on)
+        );
+        sync_planning_button(&mut gadgets, true);
+        assert!(
+            matches!(gadgets.list.get(handle).unwrap().behavior, GadgetBehavior::Button(button) if button.is_on)
+        );
+    }
 
     #[test]
     fn command_bar_open_closed_and_pressed_use_the_real_gadget_driver() {

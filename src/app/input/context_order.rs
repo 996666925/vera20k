@@ -823,6 +823,24 @@ fn finish_order(
     queued: Vec<CommandEnvelope>,
     speaker_id: Option<u64>,
 ) -> bool {
+    if state.match_state.input.planning.active() {
+        let mut queued = queued;
+        restore_selection_dispatch_order(
+            &mut queued,
+            &selected_stable_ids_in_order(
+                state
+                    .match_state
+                    .sim_runtime
+                    .as_ref()
+                    .map(|rt| &rt.simulation),
+                state.rules(),
+                &state.match_state.input.selection_order,
+                state.match_state.input.selection_order_pending,
+            ),
+        );
+        crate::app::input::planning_mode::queue_orders(state, queued);
+        return true;
+    }
     let mut queued = if let Some(sim) = state
         .match_state
         .sim_runtime
@@ -2122,7 +2140,7 @@ pub(crate) fn try_queue_context_order_at_screen_point(
     {
         state.match_state.input.queued_order_mode = OrderMode::Move;
     }
-    if rally_announce {
+    if rally_announce && !state.match_state.input.planning.active() {
         crate::app::input::dispatch::push_local_eva(
             state,
             crate::app::match_runtime::eva_producers::EVA_NEW_RALLY_POINT_ESTABLISHED,

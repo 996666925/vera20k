@@ -553,7 +553,10 @@ pub(crate) fn edge_scroll_intent(
 /// Keep this observation beside the private coast/pan state it checks.
 pub(crate) fn camera_input_idle(state: &AppState) -> bool {
     let input = &state.match_state.input;
-    input.keys_held.is_empty()
+    input
+        .keys_held
+        .iter()
+        .all(|key| input.planning.owns_key(*key))
         && input.pending_camera_scroll.is_idle()
         && !input.minimap_dragging
         && !input.tactical_mouse.captured

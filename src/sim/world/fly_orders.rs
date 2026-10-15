@@ -526,8 +526,8 @@ impl Simulation {
     }
 
     /// `FlyLocomotionClass::Begin_Landing @ 0x004CFA70`. Its first gate
-    /// (Mission != Enter and `0x006385C0`) only refuses while Techno `+0x514`
-    /// holds a planning path; VERA has no planning mode, so it always passes.
+    /// (Mission != Enter and705D60 ->6385C0) consumes the next committed
+    /// planning order and skips landing when an event was generated.
     /// A live-type AirportBound Aircraft must be in radio contact with the
     /// building in its current cell (`+0x1BC`); otherwise native calls
     /// Enter_Idle_Mode(0, 1) (vt+0x484, `0x004176F0`) and does not land.
@@ -551,6 +551,13 @@ impl Simulation {
         {
             return false;
         }
+        //4CFA79..4CFA8E: Get_Mission excludes Enter(7), then a successful
+        //planning dispatch returns before any Fly landing flags are changed.
+        let entering = entity.mission.effective().known() == Some(MissionType::Enter);
+        if !entering && self.planning_start_actor(id) {
+            return false;
+        }
+        let entity = self.substrate.entities.get(id).unwrap();
         let airport_bound = entity.category() == crate::map::entities::EntityCategory::Aircraft
             && rules
                 .and_then(|r| r.object(self.interner.resolve(entity.type_ref())))

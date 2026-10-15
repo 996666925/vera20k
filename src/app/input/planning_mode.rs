@@ -1,0 +1,519 @@
+//! Local PlanningMode edges; world::planning owns synchronized path state.
+//! Native PlanMgr6379C0/637A10, command536750 and connect63AD50.
+
+use crate::app::AppState;
+use crate::app::input::hotkeys::{HotkeyCommand, HotkeyResolution};
+use crate::audio::events::GameSoundEvent;
+use crate::net::lockstep::SynchronizedCommand;
+use crate::sim::command::CommandEnvelope;
+use winit::event::ElementState;
+use winit::keyboard::KeyCode;
+
+#[derive(Debug, Default)]
+pub(crate) struct PlanningInputState {
+    active: bool,
+    key: Option<KeyCode>,
+    refusal_tick: Option<u64>,
+    /// PlanMgr AC4BF0, a local display association retained after node delete.
+    highlighted_node: Option<u64>,
+}
+
+impl PlanningInputState {
+    pub(crate) fn active(&self) -> bool {
+        self.active
+    }
+    pub(crate) fn highlighted_node(&self) -> Option<u64> {
+        self.highlighted_node
+    }
+    pub(crate) fn node_deleted(&mut self, node_id: u64, next_node: Option<u64>) {
+        if next_node.is_some() {
+            self.highlighted_node = next_node;
+        } else if self.highlighted_node == Some(node_id) {
+            self.highlighted_node = None;
+        }
+    }
+    pub(crate) fn owns_key(&self, key: KeyCode) -> bool {
+        self.key == Some(key)
+    }
+    pub(crate) fn reset(&mut self) {
+        *self = Self::default();
+    }
+    pub(crate) fn restore_active(&mut self, active: bool) {
+        self.active = active;
+        self.key = None;
+        self.refusal_tick = None;
+        self.highlighted_node = None;
+    }
+
+    // Native63753F resets AC4C08 in the per-frame PlanMgr637270 pass.
+    fn admit_refusal(&mut self, tick: u64) -> bool {
+        if self.refusal_tick == Some(tick) {
+            return false;
+        }
+        self.refusal_tick = Some(tick);
+        true
+    }
+
+    fn key_transition(
+        &mut self,
+        planning: bool,
+        key: KeyCode,
+        pressed: bool,
+        repeat: bool,
+    ) -> Option<bool> {
+        if pressed {
+            if !planning {
+                return None;
+            }
+            if !repeat {
+                self.key = Some(key);
+            }
+            Some(if repeat { self.active } else { true })
+        } else if self.key == Some(key) {
+            self.key = None;
+            Some(false)
+        } else {
+            None
+        }
+    }
+}
+
+pub(crate) fn key_edge(
+    state: &mut AppState,
+    resolution: HotkeyResolution,
+    key: KeyCode,
+    edge: ElementState,
+    repeat: bool,
+) -> bool {
+    let planning = resolution == HotkeyResolution::Command(HotkeyCommand::PlanningMode);
+    let Some(active) =
+        state
+            .match_state
+            .input
+            .planning
+            .key_transition(planning, key, edge.is_pressed(), repeat)
+    else {
+        return false;
+    };
+    set_active(state, active);
+    true
+}
+
+pub(crate) fn toggle(state: &mut AppState) {
+    let active = !state.match_state.input.planning.active();
+    set_active(state, active);
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum PlanningRefusal {
+    Guard,
+    Stop,
+    Scatter,
+}
+
+impl PlanningRefusal {
+    fn csf_key(self) -> &'static str {
+        match self {
+            Self::Guard => "MSG:PlanningModeNoGuardArea",
+            Self::Stop => "MSG:PlanningModeNoStop",
+            Self::Scatter => "MSG:PlanningModeNoScatter",
+        }
+    }
+}
+
+/// Guard730D60 ->63A0D0 and ClickedEvent6FFE00 ->639FD0 share
+/// AC4C08, silent730A90 duration1E0, and Rules+700 ScoldSound.
+pub(crate) fn refuse(state: &mut AppState, action: PlanningRefusal) {
+    let Some(tick) = state
+        .match_state
+        .sim_runtime
+        .as_ref()
+        .map(|rt| rt.simulation.session.tick)
+    else {
+        return;
+    };
+    if !state.match_state.input.planning.admit_refusal(tick) {
+        return;
+    }
+    crate::app::input::messages::post_planning_refusal(state, action.csf_key());
+    let sound = state
+        .rules()
+        .and_then(|rules| rules.general.scold_sound.clone());
+    ui_sound(state, sound);
+}
+
+/// Host adaptation: a lost release must not leave the local mode latched.
+/// Commit the streamed plan once before dropping the physical-key owner;
+/// native WM_ACTIVATEAPP planning equivalence is not established here.
+pub(crate) fn release_on_focus_change(state: &mut AppState) {
+    state.match_state.input.planning.key = None;
+    set_active(state, false);
+}
+
+fn ui_sound(state: &mut AppState, sound: Option<String>) {
+    if let Some(sound_id) = sound {
+        state
+            .match_state
+            .match_audio
+            .sound_events
+            .push(GameSoundEvent::UiSound { sound_id });
+    }
+}
+
+fn set_active(state: &mut AppState, active: bool) {
+    if state.match_state.input.planning.active == active {
+        return;
+    }
+    // Native637A10 sends an empty PLANCOMMIT before dropping the input byte.
+    if !active
+        && let Some(rt) = state.match_state.sim_runtime.as_mut()
+        && let Some(owner) = rt.simulation.session.current_house()
+        && let Some(record) = rt.simulation.encode_plan_commit_record(owner)
+        && let Some(envelope) = SynchronizedCommand::opaque(record)
+            .decode_for_simulation(&rt.simulation, rt.simulation.session.tick)
+    {
+        rt.simulation.queue_command(envelope);
+    }
+    state.match_state.input.planning.active = active;
+    state.match_state.input.selection_state.cancel_drag();
+    let sound = state.rules().and_then(|rules| {
+        if active {
+            rules.general.start_planning_mode_sound.clone()
+        } else {
+            rules.general.end_planning_mode_sound.clone()
+        }
+    });
+    ui_sound(state, sound);
+}
+
+/// Encode the already resolved ordinary action through the planning producer.
+/// Unsupported actions are consumed, never downgraded to immediate orders.
+pub(crate) fn queue_orders(state: &mut AppState, orders: Vec<CommandEnvelope>) {
+    if let Some(rt) = state.match_state.sim_runtime.as_mut() {
+        queue_orders_in_sim(&mut rt.simulation, orders);
+    }
+}
+
+fn queue_orders_in_sim(
+    sim: &mut crate::sim::world::Simulation,
+    orders: Vec<CommandEnvelope>,
+) -> bool {
+    let mut added = false;
+    for order in orders {
+        let Some(record) = sim.encode_planning_order_record(order.owner, &order.payload) else {
+            continue;
+        };
+        if let Some(envelope) =
+            SynchronizedCommand::opaque(record).decode_for_simulation(sim, order.execute_tick)
+        {
+            sim.queue_command(envelope);
+            added = true;
+        }
+    }
+    added
+}
+
+pub(crate) fn node_at_cursor(state: &AppState) -> Option<(u16, u16)> {
+    let point = hover_native_screen(state)?;
+    let sim = &state.match_state.sim_runtime.as_ref()?.simulation;
+    let owner = sim.session.current_house()?;
+    sim.planning_node_at_screen(owner, point)
+}
+
+/// The drawing projection and input hit test share the native tactical point.
+pub(crate) fn hover_native_screen(state: &AppState) -> Option<[i32; 2]> {
+    if !state.match_state.input.planning.active() {
+        return None;
+    }
+    let (width, height) = crate::app::input::camera::tactical_viewport_size(state);
+    let (x, y) = (
+        state.match_state.input.cursor_x,
+        state.match_state.input.cursor_y,
+    );
+    if x < 0. || y < 0. || x >= width as f32 || y >= height as f32 {
+        return None;
+    }
+    Some(cursor_native_screen(state))
+}
+
+fn cursor_native_screen(state: &AppState) -> [i32; 2] {
+    let (x, y, _, _) = crate::app::input::camera::tactical_viewport_px(state);
+    input_native_screen(&state.match_state.input, [x as i32, y as i32])
+}
+
+fn input_native_screen(
+    input: &crate::app::input::state::MatchInputState,
+    origin: [i32; 2],
+) -> [i32; 2] {
+    // Match the overlay's rounded camera and logical clip origin, using the
+    // shared inverse view transform before quantizing its native hit point.
+    let point = crate::app::match_runtime::sim_tick::screen_point_to_world_with_camera(
+        (input.cursor_x, input.cursor_y),
+        (input.camera_x.round(), input.camera_y.round()),
+        input.zoom_level,
+    );
+    [
+        point.0.floor() as i32 - origin[0],
+        point.1.floor() as i32 - origin[1],
+    ]
+}
+
+pub(crate) fn connect_at_cursor(state: &mut AppState) -> bool {
+    let Some(_) = node_at_cursor(state) else {
+        return false;
+    };
+    let selected = crate::app::input::dispatch::selected_stable_ids_in_order(
+        state
+            .match_state
+            .sim_runtime
+            .as_ref()
+            .map(|rt| &rt.simulation),
+        state.rules(),
+        &state.match_state.input.selection_order,
+        state.match_state.input.selection_order_pending,
+    );
+    let point = cursor_native_screen(state);
+    if let Some(rt) = state.match_state.sim_runtime.as_mut()
+        && let Some(owner) = rt.simulation.session.current_house()
+    {
+        for actor in rt.simulation.planning_connect_actors(owner, &selected) {
+            if let Some(record) = rt
+                .simulation
+                .encode_plan_connect_record_at_screen(owner, actor, point)
+                && let Some(command) = SynchronizedCommand::opaque(record)
+                    .decode_for_simulation(&rt.simulation, rt.simulation.session.tick)
+            {
+                rt.simulation.queue_command(command);
+            }
+        }
+    }
+    true
+}
+
+pub(crate) fn delete_at_cursor(state: &mut AppState) {
+    let Some(_) = node_at_cursor(state) else {
+        return;
+    };
+    let point = cursor_native_screen(state);
+    if let Some(rt) = state.match_state.sim_runtime.as_mut()
+        && let Some(owner) = rt.simulation.session.current_house()
+        && let Some(record) = rt
+            .simulation
+            .encode_plan_node_delete_record_at_screen(owner, point)
+        && let Some(command) = SynchronizedCommand::opaque(record)
+            .decode_for_simulation(&rt.simulation, rt.simulation.session.tick)
+    {
+        rt.simulation.queue_command(command);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::map::entities::EntityCategory;
+    use crate::sim::combat::Health;
+    use crate::sim::command::Command;
+    use crate::sim::game_entity::GameEntity;
+    use crate::sim::house_state::HouseState;
+    use crate::sim::world::Simulation;
+
+    #[test]
+    fn zoomed_planning_node_hit_connect_and_delete_use_drawn_logical_pixels() {
+        for zoom in [0.75, 1.0, 1.25, 2.0] {
+            let (mut sim, local) = populated_sim();
+            let record = sim
+                .encode_planning_order_record(
+                    local,
+                    &Command::Move {
+                        entity_id: 42,
+                        target_rx: 5,
+                        target_ry: 7,
+                    },
+                )
+                .unwrap();
+            let command = sim.decode_native_command_record(&record, 0).unwrap();
+            assert!(sim.apply_command("Local", &command.payload, None));
+            let coord = sim.planning_draw_graph(local, None, None).nodes[0].coord;
+            let (x, y) = crate::util::lepton::absolute_leptons_to_screen(coord.x, coord.y, coord.z);
+            let mut input = crate::app::input::state::MatchInputState::new(Default::default());
+            input.camera_x = x - 100.25;
+            input.camera_y = y - 80.75;
+            input.zoom_level = zoom;
+            let origin = [13, 17];
+            // Forward projection mirrors the render viewport, including its
+            // rounded camera and logical clip origin.
+            input.cursor_x = (x as i32 - input.camera_x.round() as i32 + origin[0]) as f32 * zoom;
+            input.cursor_y = (y as i32 - input.camera_y.round() as i32 + origin[1]) as f32 * zoom;
+            let point = input_native_screen(&input, origin);
+            assert_eq!(
+                sim.planning_node_at_screen(local, point),
+                Some((5, 7)),
+                "zoom {zoom}"
+            );
+            let connect = sim
+                .encode_plan_connect_record_at_screen(local, 43, point)
+                .unwrap();
+            let command = sim.decode_native_command_record(&connect, 0).unwrap();
+            assert!(sim.apply_command("Local", &command.payload, None));
+            assert_eq!(sim.planning_paths(local).len(), 2);
+            let delete = sim
+                .encode_plan_node_delete_record_at_screen(local, point)
+                .unwrap();
+            let command = sim.decode_native_command_record(&delete, 0).unwrap();
+            assert!(sim.apply_command("Local", &command.payload, None));
+            assert!(sim.planning_paths(local).is_empty());
+        }
+    }
+
+    #[test]
+    fn delete_handoff_keeps_local_highlight_until_its_node_expires() {
+        let mut input = PlanningInputState::default();
+        input.node_deleted(2, Some(3));
+        assert_eq!(input.highlighted_node(), Some(3));
+        input.node_deleted(7, None);
+        assert_eq!(input.highlighted_node(), Some(3));
+        input.node_deleted(3, None);
+        assert_eq!(input.highlighted_node(), None);
+        input.node_deleted(8, Some(9));
+        input.restore_active(true);
+        assert_eq!(input.highlighted_node(), None);
+    }
+
+    fn populated_sim() -> (Simulation, crate::sim::intern::InternedId) {
+        let mut sim = Simulation::new();
+        let local = sim.interner.intern("Local");
+        let kind = sim.interner.intern("TESTUNIT");
+        sim.houses
+            .insert(local, HouseState::new(local, 0, None, false, 0, 10));
+        sim.session.house_order = vec![local];
+        for id in [42, 43] {
+            let mut entity = GameEntity::new_at_frame_zero_for_test(
+                id,
+                1,
+                1,
+                0,
+                0,
+                local,
+                Health::new(100),
+                kind,
+                EntityCategory::Unit,
+                0,
+                5,
+                false,
+            );
+            entity.lifecycle.set_in_limbo_for_test(false);
+            sim.substrate.entities.insert(entity);
+        }
+        (sim, local)
+    }
+    #[test]
+    fn planning_edges_ignore_repeat_and_release_original_physical_key() {
+        let mut input = PlanningInputState::default();
+        assert_eq!(
+            input.key_transition(true, KeyCode::KeyZ, true, false),
+            Some(true)
+        );
+        input.active = true;
+        assert_eq!(
+            input.key_transition(true, KeyCode::KeyZ, true, true),
+            Some(true)
+        );
+        assert_eq!(
+            input.key_transition(false, KeyCode::ShiftLeft, false, false),
+            None
+        );
+        assert_eq!(
+            input.key_transition(false, KeyCode::KeyZ, false, false),
+            Some(false)
+        );
+        assert_eq!(
+            input.key_transition(false, KeyCode::KeyZ, false, false),
+            None
+        );
+    }
+    #[test]
+    fn unsupported_planning_actions_never_fall_back_to_ordinary_execution() {
+        let (mut sim, local) = populated_sim();
+        for payload in [
+            Command::Stop { entity_id: 42 },
+            Command::Scatter { entity_id: 42 },
+        ] {
+            assert!(!queue_orders_in_sim(
+                &mut sim,
+                vec![CommandEnvelope::new(local, 0, payload)]
+            ));
+            assert!(sim.pending_command_snapshot().is_empty());
+        }
+    }
+
+    #[test]
+    fn planning_producer_streams_resolved_moves_in_selection_order() {
+        let (mut sim, local) = populated_sim();
+        let orders: Vec<_> = [43, 42]
+            .into_iter()
+            .map(|entity_id| {
+                CommandEnvelope::new(
+                    local,
+                    17,
+                    Command::Move {
+                        entity_id,
+                        target_rx: 5,
+                        target_ry: 7,
+                    },
+                )
+            })
+            .collect();
+        assert!(queue_orders_in_sim(&mut sim, orders.clone()));
+        let pending = sim.pending_command_snapshot();
+        assert_eq!(pending.len(), 2);
+        for (planned, ordinary) in pending.iter().zip(&orders) {
+            assert_eq!(planned.owner, ordinary.owner);
+            assert_eq!(planned.execute_tick, ordinary.execute_tick);
+            assert_eq!(
+                planned.payload,
+                Command::PlanningRecord {
+                    record: sim
+                        .encode_planning_order_record(local, &ordinary.payload)
+                        .unwrap()
+                }
+            );
+        }
+        assert!(
+            sim.entities()
+                .get(42)
+                .unwrap()
+                .navigation
+                .nav_com()
+                .is_none()
+        );
+        assert!(
+            sim.entities()
+                .get(43)
+                .unwrap()
+                .navigation
+                .nav_com()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn restored_planning_preserves_mode_without_retaining_physical_key() {
+        let mut input = PlanningInputState::default();
+        input.key_transition(true, KeyCode::KeyZ, true, false);
+        input.restore_active(true);
+        assert!(input.active());
+        assert!(!input.owns_key(KeyCode::KeyZ));
+        input.reset();
+        assert!(!input.active());
+    }
+
+    #[test]
+    fn planning_refusal_is_latched_for_one_simulation_frame() {
+        let mut input = PlanningInputState::default();
+        assert!(input.admit_refusal(17));
+        assert!(!input.admit_refusal(17));
+        assert!(input.admit_refusal(18));
+        input.restore_active(true);
+        assert!(input.admit_refusal(18));
+    }
+}

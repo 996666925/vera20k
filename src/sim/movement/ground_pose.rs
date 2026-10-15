@@ -625,6 +625,60 @@ pub(crate) fn target_get_coords(
     }
 }
 
+/// Target virtual+58: Object410540 forwards virtual+48; Cell486900 uses
+/// structural bridge height. FireAt70BCB0 and planning Foot4D8560 share it.
+pub(crate) fn target_get_target_coords(
+    target: crate::sim::combat::TargetKind,
+    entities: &crate::sim::entity_store::EntityStore,
+    terrain: Option<&ResolvedTerrainGrid>,
+) -> Option<DriveCoord> {
+    match target {
+        crate::sim::combat::TargetKind::Cell(rx, ry) => {
+            let coord = crate::sim::projectile::cell_target_coord(terrain, rx, ry);
+            Some(DriveCoord {
+                x: coord.x,
+                y: coord.y,
+                z: coord.z,
+            })
+        }
+        crate::sim::combat::TargetKind::Entity(id) => {
+            Some(object_get_coords(entities.get(id)?, terrain))
+        }
+    }
+}
+
+/// Foot4D8560/Techno705CA0, virtual+42C. An attacking object uses TarCom;
+/// another Foot prefers auxiliary NavCom, then NavCom. Without a retained
+/// target the raw Object+9C Location is returned, not its foundation center.
+pub(crate) fn current_destination_coords(
+    entity: &crate::sim::game_entity::GameEntity,
+    entities: &crate::sim::entity_store::EntityStore,
+    terrain: Option<&ResolvedTerrainGrid>,
+) -> Option<DriveCoord> {
+    use crate::sim::{combat::TargetKind, components::NavTargetRef, mission::MissionType};
+    let attacking = entity.mission.effective().known() == Some(MissionType::Attack);
+    let target = if attacking {
+        entity.attack_target.target()
+    } else if entity.category() != crate::map::entities::EntityCategory::Structure {
+        entity
+            .navigation
+            .nav_com_aux()
+            .or(entity.navigation.nav_com())
+            .map(|target| match target {
+                NavTargetRef::Cell { rx, ry } => TargetKind::Cell(rx, ry),
+                NavTargetRef::Entity { id }
+                | NavTargetRef::Object { id }
+                | NavTargetRef::Building { id } => TargetKind::Entity(id),
+            })
+    } else {
+        None
+    };
+    target.map_or_else(
+        || Some(position_world_coord(&entity.position)),
+        |target| target_get_target_coords(target, entities, terrain),
+    )
+}
+
 impl Simulation {
     /// `ObjectClass::Distance @ 0x005F6360` from object `id` to `target`: both
     /// ends' GetCoords (virtual +0x48 at `0x005F6383` and `0x005F6391`,

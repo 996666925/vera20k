@@ -514,6 +514,24 @@ impl ApplicationHandler for App {
                 // recorded before screen-specific dispatch own this state.
             }
             WindowEvent::KeyboardInput { event, .. } => {
+                // Host delivery adaptation: dialogs may consume ordinary keys,
+                // but a release for an admitted planning gesture must still
+                // end that gesture. Opening a menu itself never commits it.
+                if !event.state.is_pressed()
+                    && state.frontend.screen == GameScreen::InGame
+                    && let PhysicalKey::Code(code) = event.physical_key
+                    && state.match_state.input.planning.owns_key(code)
+                {
+                    crate::app::input::planning_mode::key_edge(
+                        state,
+                        crate::app::input::hotkeys::HotkeyResolution::Unhandled,
+                        code,
+                        event.state,
+                        event.repeat,
+                    );
+                    state.match_state.input.keys_held.remove(&code);
+                    return;
+                }
                 // cursor lock toggle: flip the window cursor
                 // clip so the pointer cannot leave the game (and back). Works
                 // on every screen, like the rest of the lock feature.

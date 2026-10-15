@@ -1048,7 +1048,7 @@ impl Simulation {
     /// Executed native latch/END/NavQueue controls: foot_enter_idle.json.
     /// Actual-GI Archive consumer: basic-factory-output-prerequisites packet.
     /// The class tail runs even when this base returns false for the latch.
-    /// Scatter+687, legacy planning+520 and non-cell NavQueue remain named
+    /// Scatter+687, Formation+520 and non-cell NavQueue remain named
     /// sibling residuals; fresh factory E1 has their constructor-empty state.
     pub(crate) fn foot_enter_idle_base(
         &mut self,
@@ -1066,10 +1066,12 @@ impl Simulation {
         entity.mission_leaf.set_foot_idle_entry_latch(1);
         // Foot4D82D9 -> Techno709A54 lets a held Temporal target go first,
         // then asks RefreshMegaMission (vt+0x4D0, Techno709A5D) whether an
-        // attack-move resumes. Its false answer would ask the planning path
-        // (vt+0x430), which VERA does not represent.
+        // attack-move resumes. Its false answer asks the active PlanMgr
+        // path (Techno+0x430=705D50 ->6385C0).
         self.temporal_release_if_warping(id);
-        self.foot_refresh_mega_mission(id, rules, registry, effects);
+        if !self.foot_refresh_mega_mission(id, rules, registry, effects) {
+            self.planning_enter_idle(id);
+        }
         // Foot4D831A..8376 asks the active IPiggyback, whatever its class,
         // and ends it before NavQueue when its Is_Ok_To_End allows.
         // Unit saves the base return but still executes its own receiver tail.
@@ -1177,7 +1179,7 @@ impl Simulation {
     /// placement, and locomotor/radio callers. The first argument skips the
     /// human harvester land check when nonzero. Native executable controls:
     /// tools/spatial_oracle/harvest_attack_return.json, track_destination.json
-    /// and foot_enter_idle.json. The Foot planning path remains a separate
+    /// and foot_enter_idle.json. The Foot Formation path remains a separate
     /// residual.
     pub(crate) fn unit_enter_idle_mode(
         &mut self,

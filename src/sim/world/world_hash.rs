@@ -662,6 +662,7 @@ impl Simulation {
     fn fold_before_fog(&self, hasher: &mut impl Hasher) {
         self.session.tick.hash(hasher);
         self.session.binary_frame.hash(hasher);
+        self.planning.hash_state(hasher);
         // ScenarioClass owns the sole saved/synchronized RNG. Main and MapGen
         // are process globals and are deliberately absent from this hash.
         self.scenario_rng.hash_state(hasher);

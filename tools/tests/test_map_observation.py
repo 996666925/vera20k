@@ -605,6 +605,55 @@ class MapObservationTests(unittest.TestCase):
         self.assertEqual(transcript['frames'][0]['input']['local_input'], self.local_input_observation())
         self.assertEqual(observation.validate_run(self.output)['status'], 'VALID')
 
+    def test_planning_edges_and_paths_validate_production_protocol(self):
+        self.keyboard_profile()
+        self.keyboard_bindings.append({'command': 'PlanningMode', 'first_key': 90})
+        for index, edge in enumerate(('pressed', 'repeat', 'released')):
+            request = self.profile['gestures'][index]
+            request['gesture'] = {'kind': 'key', 'key': 'Z', 'edge': edge}
+            receipt = self.gesture_receipts[index]
+            receipt['gesture'] = deepcopy(request['gesture'])
+            receipt['keyboard'] = {'encoded_key': 90, 'binding_command': 'PlanningMode',
+                'press_held': True, 'release_cleared': edge == 'released',
+                'planning_before': index != 0, 'planning_after': edge != 'released'}
+            for when in ('before', 'after'):
+                receipt[when].update(planning_active=edge != 'released', planning_paths=[{
+                    'actor_id': 7, 'cells': [[10, 11], [12, 13]],
+                    'loop_start': None, 'editing': edge != 'released'}])
+        self.profile_path.write_text(json.dumps(self.profile))
+        report = self.run_capture()
+        self.assertEqual(report['status'], 'VALID', report['errors'])
+        self.gesture_receipts[0]['keyboard']['planning_after'] = False
+        self.output = self.root / 'invalid-planning-observation'
+        self.assertEqual(self.run_capture()['status'], 'INVALID')
+
+    def test_planning_path_receipt_rejects_bad_cells_and_loop_indexes(self):
+        row = self.input_observation()
+        row.update(planning_active=True, planning_paths=[{'actor_id': 7,
+            'cells': [[10, 11]], 'loop_start': 0, 'editing': True}])
+        self.assertEqual(observation._input_observation(row, 'fixture'), 2)
+        with patch.object(observation, 'MAX_OBSERVATION_SAMPLES', 1):
+            with self.assertRaises(ValidationError):
+                observation._input_observation(row, 'fixture')
+        for field, value in [('cells', [[1]]), ('cells', [[-1, 0]]),
+                             ('loop_start', 1), ('editing', 1)]:
+            invalid = deepcopy(row)
+            invalid['planning_paths'][0][field] = value
+            with self.assertRaises(ValidationError):
+                observation._input_observation(invalid, 'fixture')
+
+    def test_planning_profile_has_balanced_production_key_edges(self):
+        profile = json.loads((observation.ROOT / 'tools/map_observation.planning-mode.example.json').read_text())
+        observation._profile_extensions(profile)
+        taps = [row for row in profile['gestures'] if row['gesture'].get('key') in ('S', 'X')]
+        self.assertEqual([row['gesture']['key'] for row in taps], ['S', 'X'])
+        self.assertTrue(all(2 < row['issue_after_step'] < 5 for row in taps))
+        for gestures in [profile['gestures'][1:], profile['gestures'][:-4]]:
+            invalid = deepcopy(profile)
+            invalid['gestures'] = gestures
+            with self.assertRaises(ValidationError):
+                observation._profile_extensions(invalid)
+
     def audio_profile(self):
         # Synthetic protocol bytes, not an audio/native parity golden.
         self.profile.update(schema_version=observation.PROFILE_V2, observe_audio={

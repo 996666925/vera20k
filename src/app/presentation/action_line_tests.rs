@@ -50,15 +50,7 @@ fn drawing_rows() -> impl Iterator<Item = &'static Value> {
         .as_array()
         .unwrap()
         .iter()
-        .chain(
-            native()["tactical_gate_cases"]
-                .as_array()
-                .unwrap()
-                .iter()
-                // Planning input/lifecycle is a separate required chain. These
-                // comparisons cover every executed ordinary (planning-off) gate.
-                .filter(|row| row["input"]["planning"] == false),
-        )
+        .chain(native()["tactical_gate_cases"].as_array().unwrap().iter())
         .chain(native()["batch_cases"].as_array().unwrap().iter())
 }
 
@@ -365,6 +357,7 @@ fn built(row: &Value, zoom: f32) -> (Vec<SpriteInstance>, TacticalViewport) {
     view.zoom = zoom;
     let instances = build_target_line_instances(
         &state,
+        row["input"]["planning"].as_bool().unwrap_or(false),
         Some(&sim),
         rules.as_ref(),
         Some(&palette_bytes()),
@@ -508,7 +501,7 @@ fn original_foot_move_line_pixels_through_production_builder() {
         );
         count += 1;
     }
-    assert_eq!(count, 120);
+    assert_eq!(count, 128);
 }
 
 #[test]
@@ -526,6 +519,7 @@ fn original_unit_attack_line_pixels_and_read_only_coordinate_queries() {
         let dummy = query.dummy().snapshot();
         let instances = build_target_line_instances(
             &state,
+            false,
             Some(&sim),
             rules.as_ref(),
             Some(&palette_bytes()),
@@ -792,7 +786,14 @@ fn move_line_query_leaves_the_simulation_dummy_unchanged() {
     let terrain = sim.resolved_terrain.as_ref().unwrap();
     let query = NativeCellQuery::canonical(terrain);
     let before = query.dummy().snapshot().coord;
-    let _ = build_target_line_instances(&state, Some(&sim), None, Some(&palette_bytes()), view);
+    let _ = build_target_line_instances(
+        &state,
+        false,
+        Some(&sim),
+        None,
+        Some(&palette_bytes()),
+        view,
+    );
     assert_eq!(query.dummy().snapshot().coord, before);
 }
 

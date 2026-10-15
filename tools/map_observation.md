@@ -398,6 +398,26 @@ Run these profiles with a fresh scratch working directory/config: the production
 save repository uses that working directory's `saves/` folder. There is no
 diagnostic save backend or bypass of preparation/commit.
 
+The [planning mode profile](map_observation.planning-mode.example.json) selects
+the opening AMCV through the ordinary production command, holds literal Z across
+two tactical clicks, sends a repeated press, taps S and X while held, then
+releases it. The S/X gesture receipts expose the refusal HUD rows and preserve
+the queued-command list so an ordinary Stop/Scatter fallback can be detected. A second sequence
+uses the loaded `PlanningMode` command-bar gadget. The capture runs 1200 steps
+and retains the editing state, queued opaque planning records and subsequent
+movement. It requires the stock Z binding and a loaded, open command bar.
+
+Optional `edge` on a key gesture is `pressed`, `repeat` or `released`; omission
+keeps the historical full tap. The production keyboard dispatcher permits
+separate edges only for the actual planning binding or its owned release.
+Profiles must balance every press and release. The camera seal admits only that
+planning-owned held key; other held keys remain invalid. Keyboard receipts add
+`planning_before` and `planning_after`; input observations add `planning_active`
+and `planning_paths` (actor ID, ordered cells, optional loop start and editing
+flag). These read the simulation owner without changing it. The Python validator
+checks types, bounds, key-edge outcomes and matching releases; historical
+receipts may omit the added planning fields.
+
 A v2 `command_bar` gesture names an exact loaded bar command, for example
 `{"kind":"command_bar","command":"Guard"}`. Rust resolves the name through
 the existing command registry, current UIMD slot layout and retained gadget,

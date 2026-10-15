@@ -150,6 +150,17 @@ pub(super) fn dispatch_sim_sound_events(
     // Convert sim sound events to app-layer sound events for playback.
     for sim_event in events {
         let app_event: GameSoundEvent = match sim_event {
+            SimSoundEvent::PlanningNodeAdded { owner } => {
+                // PlanMgr638120 accepts the node before producing this cue.
+                // Issuing bytes alone cannot play it: admission may reject them.
+                if !owner_is_local(&sim.interner, owner, local_owner_name) {
+                    continue;
+                }
+                let Some(sound_id) = rules.general.add_planning_mode_command_sound.clone() else {
+                    continue;
+                };
+                GameSoundEvent::UiSound { sound_id }
+            }
             SimSoundEvent::TriggerEva { index } => GameSoundEvent::TriggerEva { index },
             SimSoundEvent::UnitVoiceVisit { owner } => GameSoundEvent::UnitVoiceVisit { owner },
             SimSoundEvent::UnitVoiceRequested { owner, sound_id } => {
@@ -1451,6 +1462,58 @@ mod tests {
             &emitted[0],
             GameSoundEvent::UiSound { sound_id } if sound_id == "PlaceBuilding"
         ));
+    }
+
+    /// PlanMgr638120 emits the add cue only after node admission; dispatch
+    /// preserves that event and plays it solely for its local owning house.
+    #[test]
+    fn planning_add_sound_uses_retail_rule_and_local_admitted_event() {
+        let Some(retail) = crate::rules::retail_ini_fixture::retail_battle_rules() else {
+            return;
+        };
+        let mut rules = retail.rules;
+        let expected = rules
+            .general
+            .add_planning_mode_command_sound
+            .clone()
+            .expect("retail planning add sound");
+        let mut sim = Simulation::new();
+        let local = sim.interner.intern("Local");
+        let remote = sim.interner.intern("Remote");
+        let events = [
+            SimSoundEvent::PlanningNodeAdded { owner: remote },
+            SimSoundEvent::PlanningNodeAdded { owner: local },
+        ];
+        let mut output = SoundEventQueue::new();
+        dispatch_sim_sound_events(
+            events.clone(),
+            &sim,
+            &rules,
+            Some("LOCAL"),
+            &mut |_| panic!("planning add is not a radar event"),
+            &mut output,
+        );
+        assert!(matches!(output.drain().as_slice(),
+            [GameSoundEvent::UiSound { sound_id }] if *sound_id == expected));
+        dispatch_sim_sound_events(
+            events.clone(),
+            &sim,
+            &rules,
+            None,
+            &mut |_| panic!("planning add is not a radar event"),
+            &mut output,
+        );
+        assert!(output.drain().is_empty());
+        rules.general.add_planning_mode_command_sound = None;
+        dispatch_sim_sound_events(
+            events,
+            &sim,
+            &rules,
+            Some("Local"),
+            &mut |_| panic!("planning add is not a radar event"),
+            &mut output,
+        );
+        assert!(output.drain().is_empty());
     }
 
     #[test]

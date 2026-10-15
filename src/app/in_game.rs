@@ -24,6 +24,7 @@ impl App {
     }
 
     pub(super) fn return_to_main_menu(state: &mut AppState) {
+        state.match_state.input.planning.reset();
         let wall_ms =
             crate::app::match_runtime::sim_tick::monotonic_frame_pacer_ms(state, Instant::now());
         crate::app::radar_movie::retire(state, wall_ms);
@@ -97,6 +98,7 @@ impl App {
         state.platform.live_modifiers = ModifiersState::empty();
         state.platform.held_modifier_keys.clear();
         state.match_state.input.type_select.clear_held();
+        crate::app::input::planning_mode::release_on_focus_change(state);
         // gamemd-derived: the `WM_ACTIVATEAPP` changed edge at 0x007778AC
         // stops/restores the primary DirectSound output through 0x00407020 /
         // 0x00407040 while secondary playback cursors continue. Keep this on

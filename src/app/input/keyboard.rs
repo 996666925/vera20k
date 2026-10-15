@@ -40,14 +40,24 @@ pub(crate) fn in_game_key_edge(
     if locked && is_escape {
         resolution = hotkeys::HotkeyResolution::Command(hotkeys::HotkeyCommand::Options);
     }
-    if (is_escape || !dev_ui_consumed) && (!locked || is_escape) {
-        let consumed = crate::app::input::dispatch::handle_type_select_key_edge(
+    let owned_planning_release =
+        !edge.state.is_pressed() && state.match_state.input.planning.owns_key(edge.physical);
+    if owned_planning_release || ((is_escape || !dev_ui_consumed) && (!locked || is_escape)) {
+        let planning_consumed = crate::app::input::planning_mode::key_edge(
             state,
             resolution,
             edge.physical,
             edge.state,
             edge.repeat,
         );
+        let consumed = planning_consumed
+            || crate::app::input::dispatch::handle_type_select_key_edge(
+                state,
+                resolution,
+                edge.physical,
+                edge.state,
+                edge.repeat,
+            );
         if edge.state.is_pressed() && !edge.repeat && !consumed {
             crate::app::input::dispatch::handle_hotkey_pressed(state, resolution, edge.physical);
         }

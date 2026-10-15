@@ -368,6 +368,13 @@ impl ScatterRecord {
 /// The represented ordinary orders of native MegaMission opcode `0x04`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MegaMissionOrder {
+    Attack {
+        target: MegaMissionTarget,
+    },
+    AttackMove {
+        target: MegaMissionTarget,
+        destination: MegaMissionTarget,
+    },
     Move {
         target_x: i16,
         target_y: i16,
@@ -391,7 +398,7 @@ pub enum MegaMissionTarget {
 }
 
 impl MegaMissionTarget {
-    fn token(self) -> Result<(i32, u8), MegaMissionCellTokenError> {
+    pub(crate) fn token(self) -> Result<(i32, u8), MegaMissionCellTokenError> {
         match self {
             Self::Null => Ok((0, NULL_TARGET_KIND)),
             Self::Cell { x, y } => Ok((encode_megamission_cell_token(x, y)?, CELL_TARGET_KIND)),
@@ -399,7 +406,7 @@ impl MegaMissionTarget {
         }
     }
 
-    fn from_token(value: i32, kind: u8) -> Option<Self> {
+    pub(crate) fn from_token(value: i32, kind: u8) -> Option<Self> {
         match kind {
             NULL_TARGET_KIND if value == 0 => Some(Self::Null),
             CELL_TARGET_KIND => {
@@ -440,6 +447,11 @@ impl MegaMissionRecord {
         // Player_Send_Command6FFBE0 ->646E90 places a Guard post in the
         // first token. Move places its cell in the second token instead.
         let (action, target, destination) = match self.order {
+            MegaMissionOrder::Attack { target } => (1, target, MegaMissionTarget::Null),
+            MegaMissionOrder::AttackMove {
+                target,
+                destination,
+            } => (29, target, destination),
             MegaMissionOrder::Move { target_x, target_y } => (
                 MOVE_ACTION,
                 MegaMissionTarget::Null,
@@ -477,9 +489,8 @@ impl MegaMissionRecord {
         Ok(())
     }
 
-    /// Decode the represented ordinary Move/Area Guard forms. Planning,
-    /// attack-move, a Move with no destination and other token/action shapes
-    /// remain outside this contract.
+    /// Decode represented ordinary Move, Attack, AttackMove and AreaGuard
+    /// forms. Planning flags are dispatched by the PlanMgr owner.
     pub fn decode(record: &CommandRecord) -> Option<Self> {
         if record.opcode() != MEGAMISSION_OPCODE || record.house_id() < 0 {
             return None;
@@ -501,13 +512,7 @@ impl MegaMissionRecord {
                 .try_into()
                 .ok()?,
         );
-        let auxiliary = i32::from_le_bytes(
-            payload[MEGAMISSION_AUXILIARY_VALUE_OFFSET..MEGAMISSION_AUXILIARY_KIND_OFFSET]
-                .try_into()
-                .ok()?,
-        );
         if payload[MEGAMISSION_SOURCE_KIND_OFFSET] != ABSTRACT_OBJECT_TARGET_KIND
-            || auxiliary != source_id
             || payload[MEGAMISSION_AUXILIARY_KIND_OFFSET] != NULL_TARGET_KIND
             || payload[MEGAMISSION_PLANNING_OFFSET] != 0
         {
@@ -520,6 +525,11 @@ impl MegaMissionRecord {
             payload[MEGAMISSION_DESTINATION_KIND_OFFSET],
         )?;
         let order = match (action, target, destination) {
+            (1, target, MegaMissionTarget::Null) => MegaMissionOrder::Attack { target },
+            (29, target, destination) => MegaMissionOrder::AttackMove {
+                target,
+                destination,
+            },
             (MOVE_ACTION, MegaMissionTarget::Null, MegaMissionTarget::Cell { x, y }) => {
                 MegaMissionOrder::Move {
                     target_x: x,
@@ -578,6 +588,9 @@ impl TryFrom<&[u8]> for CommandRecord {
 /// One gameplay command payload.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Command {
+    /// PlanMgr637E00/638120 keeps native command records while editing.
+    /// The same record travels through transport, replay and snapshot storage.
+    PlanningRecord { record: CommandRecord },
     /// Complete local selection snapshot, committed through ObjectSelect
     /// admission before live Logic. Kept as a command for replay/persistence.
     Select {
@@ -755,6 +768,34 @@ pub enum Command {
     /// Event7: Scatter(NULL, forced=true, no_kidding=false). Appended so
     /// existing saved/replayed command variant indices remain unchanged.
     Scatter { entity_id: u64 },
+}
+
+impl Command {
+    /// Actor of an ordinary MegaMission DTO. Scheduling and PlanningMode
+    /// cancellation share this classification; internal mission changes do not
+    /// pass through it. Event4C72xx clears planning tokens before retasking.
+    pub(crate) fn megamission_actor(&self) -> Option<u64> {
+        match self {
+            Self::Move { entity_id, .. }
+            | Self::MoveToObject { entity_id, .. }
+            | Self::AttackMove { entity_id, .. }
+            | Self::Guard { entity_id, .. }
+            | Self::MinerReturn { entity_id, .. }
+            | Self::RepairAtDepot { entity_id, .. }
+            | Self::HarvestCell { entity_id, .. }
+            | Self::ToggleInfantryDeploy { entity_id } => Some(*entity_id),
+            Self::Attack { attacker_id, .. }
+            | Self::ForceAttack { attacker_id, .. }
+            | Self::ForceAttackCell { attacker_id, .. }
+            | Self::PlantC4 { attacker_id, .. } => Some(*attacker_id),
+            Self::EnterTransport { passenger_id, .. } => Some(*passenger_id),
+            Self::EnterBunker { unit_id, .. } => Some(*unit_id),
+            Self::EjectBunker { bunker_id } => Some(*bunker_id),
+            Self::UnloadPassengers { transport_id } => Some(*transport_id),
+            Self::CaptureBuilding { engineer_id, .. } => Some(*engineer_id),
+            _ => None,
+        }
+    }
 }
 
 /// Command with deterministic execution metadata.
@@ -1010,7 +1051,12 @@ mod tests {
         assert_eq!(MegaMissionRecord::decode(&wrong_action), None);
         let mut wrong_repeat = valid.clone();
         wrong_repeat.payload_mut()[17..21].copy_from_slice(&8_i32.to_le_bytes());
-        assert_eq!(MegaMissionRecord::decode(&wrong_repeat), None);
+        // Connect63684F rewrites only source. A null auxiliary token's value
+        // remains the source template's identity and is semantically ignored.
+        assert_eq!(
+            MegaMissionRecord::decode(&wrong_repeat),
+            MegaMissionRecord::decode(&valid)
+        );
     }
 
     /// The object receiver `0x004D74E0` sends Move with the object as its

@@ -7343,7 +7343,7 @@ fn gsi_13_06_shp_counter_admission_uses_only_tube_state_at_unit_ai_entry() {
 }
 
 #[test]
-fn test_move_command_rejects_non_owned_entity() {
+fn move_event_issuer_does_not_replace_actor_owner() {
     let mut sim: Simulation = Simulation::new();
     sim.spawn_from_map(
         &[MapEntity {
@@ -7382,11 +7382,15 @@ fn test_move_command_rejects_non_owned_entity() {
 
     let _ = sim.advance_tick(&[cmd], None, Some(&grid), None, 33);
     assert!(
-        sim.substrate
-            .entities
-            .get(1)
-            .is_some_and(|e| e.navigation.nav_com().is_none()),
-        "another house's Move is refused"
+        sim.substrate.entities.get(1).is_some_and(
+            |e| e.navigation.nav_com() == Some(crate::sim::components::NavTargetRef::cell(8, 2))
+        ),
+        "Event4C71CA resolves the actor independently of the issuer"
+    );
+    assert_eq!(
+        sim.interner
+            .resolve(sim.substrate.entities.get(1).unwrap().owner()),
+        "Americans"
     );
 }
 

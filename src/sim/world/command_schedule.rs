@@ -259,26 +259,10 @@ impl Simulation {
     }
 
     fn command_uses_megamission(command: &Command) -> bool {
-        matches!(
-            command,
-            Command::Move { .. }
-                | Command::MoveToObject { .. }
-                | Command::Attack { .. }
-                | Command::ForceAttack { .. }
-                | Command::AttackMove { .. }
-                | Command::Guard { .. }
-                | Command::MinerReturn { .. }
-                | Command::RepairAtDepot { .. }
-                | Command::EnterTransport { .. }
-                | Command::EnterBunker { .. }
-                | Command::EjectBunker { .. }
-                | Command::UnloadPassengers { .. }
-                | Command::HarvestCell { .. }
-                | Command::CaptureBuilding { .. }
-                | Command::PlantC4 { .. }
-                | Command::ToggleInfantryDeploy { .. }
-                | Command::ForceAttackCell { .. }
-        )
+        if let Command::PlanningRecord { record } = command {
+            return record.opcode() == 4;
+        }
+        command.megamission_actor().is_some()
     }
 
     /// The run key of `0x0064CDA0`'s caller: action, target and destination
@@ -287,18 +271,37 @@ impl Simulation {
     /// onto an object, and an attack-move with a target or an object
     /// destination, have no key: each ends a run and is never spread. The
     /// click never sends an attack-move with both tokens.
-    fn formation_key(command: &Command) -> Option<(u8, u16, u16)> {
+    fn formation_key(command: &Command) -> Option<((u8, i32, u8), u16, u16)> {
         match command {
             Command::Move {
                 target_rx,
                 target_ry,
                 ..
-            } => Some((0, *target_rx, *target_ry)),
+            } => Some(((2, 0, 0), *target_rx, *target_ry)),
             Command::AttackMove {
                 target: None,
                 destination: Some(crate::sim::combat::TargetKind::Cell(rx, ry)),
                 ..
-            } => Some((1, *rx, *ry)),
+            } => Some(((29, 0, 0), *rx, *ry)),
+            // 64CB0A..64CBDB groups all staged opcode4 records by mission,
+            // target and destination tokens, including planning flags1/2.
+            Command::PlanningRecord { record } if record.opcode() == 4 => {
+                let p = record.payload();
+                if p[16] != 11 {
+                    return None;
+                }
+                let destination = i32::from_le_bytes(p[12..16].try_into().ok()?);
+                let crate::sim::command::MegaMissionTarget::Cell { x, y } =
+                    crate::sim::command::MegaMissionTarget::from_token(destination, 11)?
+                else {
+                    return None;
+                };
+                Some((
+                    (p[5], i32::from_le_bytes(p[7..11].try_into().ok()?), p[11]),
+                    x as u16,
+                    y as u16,
+                ))
+            }
             _ => None,
         }
     }
@@ -307,6 +310,13 @@ impl Simulation {
         match command {
             Command::Move { entity_id, .. } | Command::AttackMove { entity_id, .. } => {
                 Some(*entity_id)
+            }
+            Command::PlanningRecord { record } if record.opcode() == 4 => {
+                let p = record.payload();
+                if p[4] != 0x34 {
+                    return None;
+                }
+                u64::try_from(i32::from_le_bytes(p[0..4].try_into().ok()?)).ok()
             }
             _ => None,
         }
@@ -517,6 +527,16 @@ impl Simulation {
                         } => {
                             *target_rx = assignment.destination.0 as u16;
                             *target_ry = assignment.destination.1 as u16;
+                        }
+                        Command::PlanningRecord { record } => {
+                            let destination = crate::sim::command::MegaMissionTarget::Cell {
+                                x: assignment.destination.0,
+                                y: assignment.destination.1,
+                            }
+                            .token()
+                            .expect("Cell target token");
+                            record.payload_mut()[12..16]
+                                .copy_from_slice(&destination.0.to_le_bytes());
                         }
                         _ => {}
                     }

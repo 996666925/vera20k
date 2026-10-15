@@ -151,7 +151,7 @@ impl Simulation {
         })
     }
 
-    /// Build the native MegaMission record for an ordinary Move or Area Guard.
+    /// Build the native MegaMission record for represented player missions.
     ///
     /// `EventClass__BuildMegaMissionEnvelope` at `gamemd.exe` `0x004C6860`
     /// stores HouseClass registration and Abstract stable identity separately;
@@ -161,7 +161,53 @@ impl Simulation {
         command_owner: crate::sim::intern::InternedId,
         command: &Command,
     ) -> Option<CommandRecord> {
+        let token = |target: Option<combat::TargetKind>| -> Option<MegaMissionTarget> {
+            Some(match target {
+                None => MegaMissionTarget::Null,
+                Some(combat::TargetKind::Cell(x, y)) => MegaMissionTarget::Cell {
+                    x: x as i16,
+                    y: y as i16,
+                },
+                Some(combat::TargetKind::Entity(id)) => MegaMissionTarget::Object {
+                    id: i32::try_from(id).ok()?,
+                },
+            })
+        };
         let (source_id, order) = match *command {
+            Command::Attack {
+                attacker_id,
+                target_id,
+            }
+            | Command::ForceAttack {
+                attacker_id,
+                target_id,
+            } => (
+                attacker_id,
+                MegaMissionOrder::Attack {
+                    target: token(Some(combat::TargetKind::Entity(target_id)))?,
+                },
+            ),
+            Command::ForceAttackCell {
+                attacker_id,
+                target_rx,
+                target_ry,
+            } => (
+                attacker_id,
+                MegaMissionOrder::Attack {
+                    target: token(Some(combat::TargetKind::Cell(target_rx, target_ry)))?,
+                },
+            ),
+            Command::AttackMove {
+                entity_id,
+                target,
+                destination,
+            } => (
+                entity_id,
+                MegaMissionOrder::AttackMove {
+                    target: token(target)?,
+                    destination: token(destination)?,
+                },
+            ),
             Command::Move {
                 entity_id,
                 target_rx,
@@ -183,18 +229,7 @@ impl Simulation {
                 },
             ),
             Command::Guard { entity_id, target } => {
-                let post = match target {
-                    None => MegaMissionTarget::Null,
-                    Some(combat::TargetKind::Cell(x, y)) => MegaMissionTarget::Cell {
-                        // Preserve native signed CellStruct word bits. The
-                        // codec still rejects pairs its token cannot roundtrip.
-                        x: x as i16,
-                        y: y as i16,
-                    },
-                    Some(combat::TargetKind::Entity(id)) => MegaMissionTarget::Object {
-                        id: i32::try_from(id).ok()?,
-                    },
-                };
+                let post = token(target)?;
                 (entity_id, MegaMissionOrder::AreaGuard { post })
             }
             _ => return None,
@@ -279,6 +314,24 @@ impl Simulation {
         record: &CommandRecord,
         execute_tick: u64,
     ) -> Option<CommandEnvelope> {
+        // PlanMgr637E00/638120 owns the payload and validates live actors.
+        // Keep its native byte record intact through the scheduled envelope.
+        if matches!(record.opcode(), 0x2A..=0x2C)
+            || (record.opcode() == crate::sim::command::MEGAMISSION_OPCODE
+                && matches!(record.payload()[22], 1 | 2))
+        {
+            let house_index = usize::try_from(record.house_id()).ok()?;
+            let owner = *self.session.house_order.get(house_index)?;
+            return self.houses.contains_key(&owner).then(|| {
+                CommandEnvelope::new(
+                    owner,
+                    execute_tick,
+                    Command::PlanningRecord {
+                        record: record.clone(),
+                    },
+                )
+            });
+        }
         if let Some(typed) = ScatterRecord::decode(record) {
             let house_index = usize::try_from(typed.house_id).ok()?;
             let owner = *self.session.house_order.get(house_index)?;
@@ -301,7 +354,45 @@ impl Simulation {
             }
             let entity_id = u64::try_from(typed.source_id).ok()?;
             self.substrate.entities.get(entity_id)?;
+            let target = |token: MegaMissionTarget| -> Option<Option<combat::TargetKind>> {
+                Some(match token {
+                    MegaMissionTarget::Null => None,
+                    MegaMissionTarget::Cell { x, y } => {
+                        Some(combat::TargetKind::Cell(x as u16, y as u16))
+                    }
+                    MegaMissionTarget::Object { id } => {
+                        Some(combat::TargetKind::Entity(u64::try_from(id).ok()?))
+                    }
+                })
+            };
             let command = match typed.order {
+                MegaMissionOrder::Attack {
+                    target: attack_target,
+                } => match target(attack_target)? {
+                    // Event4C7467 already carries the admitted target. Ctrl
+                    // and ordinary Attack encode identical bytes; do not run
+                    // the input-side friendship filter again on receipt.
+                    Some(combat::TargetKind::Entity(target_id)) => Command::ForceAttack {
+                        attacker_id: entity_id,
+                        target_id,
+                    },
+                    Some(combat::TargetKind::Cell(target_rx, target_ry)) => {
+                        Command::ForceAttackCell {
+                            attacker_id: entity_id,
+                            target_rx,
+                            target_ry,
+                        }
+                    }
+                    None => return None,
+                },
+                MegaMissionOrder::AttackMove {
+                    target: attack_target,
+                    destination,
+                } => Command::AttackMove {
+                    entity_id,
+                    target: target(attack_target)?,
+                    destination: target(destination)?,
+                },
                 MegaMissionOrder::Move { target_x, target_y } => Command::Move {
                     entity_id,
                     target_rx: u16::try_from(target_x).ok()?,
@@ -313,15 +404,7 @@ impl Simulation {
                 },
                 MegaMissionOrder::AreaGuard { post } => Command::Guard {
                     entity_id,
-                    target: match post {
-                        MegaMissionTarget::Null => None,
-                        MegaMissionTarget::Cell { x, y } => {
-                            Some(combat::TargetKind::Cell(x as u16, y as u16))
-                        }
-                        MegaMissionTarget::Object { id } => {
-                            Some(combat::TargetKind::Entity(u64::try_from(id).ok()?))
-                        }
-                    },
+                    target: target(post)?,
                 },
             };
             return Some(CommandEnvelope::new(owner, execute_tick, command));
@@ -628,7 +711,46 @@ impl Simulation {
         overlay_registry: Option<&crate::rules::overlay_types::OverlayTypeRegistry>,
         frame_effects: FrameEffects<'_>,
     ) -> bool {
+        // Event command receivers clear Plan tokens before applying ordinary
+        // orders. Flag2 acknowledges its path without detaching it; use the
+        // same payload dispatcher while keeping state installed for callbacks.
+        let decoded_planned;
+        let planned = matches!(cmd, Command::PlanningRecord { record }
+            if record.opcode() == 4 && record.payload()[22] == 2);
+        let cmd = if planned {
+            let Command::PlanningRecord { record } = cmd else {
+                unreachable!()
+            };
+            let mut ordinary = record.clone();
+            ordinary.payload_mut()[22] = 0;
+            let Some(typed) = MegaMissionRecord::decode(&ordinary) else {
+                return false;
+            };
+            let Some(envelope) = self.decode_native_command_record(&ordinary, self.session.tick)
+            else {
+                return false;
+            };
+            if let Ok(actor) = u64::try_from(typed.source_id) {
+                self.planning_acknowledge(actor);
+            }
+            decoded_planned = envelope.payload;
+            &decoded_planned
+        } else {
+            cmd
+        };
+        let ordinary_actor = match cmd {
+            Command::Stop { entity_id }
+            | Command::Scatter { entity_id }
+            | Command::DeployMcv { entity_id } => Some(*entity_id),
+            _ => cmd.megamission_actor(),
+        };
+        if !planned && let Some(actor) = ordinary_actor {
+            self.planning_detach_actor(actor);
+        }
         match cmd {
+            Command::PlanningRecord { record } => {
+                self.apply_planning_record(command_owner, record, rules)
+            }
             Command::Select { entity_ids, .. } => self.apply_selection_snapshot(
                 entity_ids,
                 super::UninitContext::new(rules, overlay_registry).with_effects(frame_effects),
@@ -636,8 +758,7 @@ impl Simulation {
             Command::Scatter { entity_id } => {
                 // Event7 4C7859..4C78D5: clear planning tokens, then Foot,
                 // alive, on-map and untethered. There is no HP/owner/mission
-                // gate. Planning mode/back-pointers have no current owner;
-                // that separate unimplemented route remains a residual.
+                // gate. Planning associations were cleared above.
                 let admitted = self
                     .substrate
                     .entities
@@ -674,7 +795,6 @@ impl Simulation {
                 target_rx,
                 target_ry,
             } => self.apply_megamission_command(
-                command_owner,
                 *entity_id,
                 MissionType::Move,
                 None,
@@ -687,7 +807,6 @@ impl Simulation {
                 entity_id,
                 target_id,
             } => self.apply_megamission_command(
-                command_owner,
                 *entity_id,
                 MissionType::Move,
                 None,
@@ -851,9 +970,6 @@ impl Simulation {
                 attacker_id,
                 target_id,
             } => {
-                if !self.entity_owned_by_id(command_owner, *attacker_id) {
-                    return false;
-                }
                 if !self.substrate.entities.contains(*target_id) {
                     return false;
                 }
@@ -921,9 +1037,6 @@ impl Simulation {
                 target_rx,
                 target_ry,
             } => {
-                if !self.entity_owned_by_id(command_owner, *attacker_id) {
-                    return false;
-                }
                 // Native order admission (actor half only — a cell token names
                 // no object, so the Target/Destination gates do not apply).
                 if !self.order_actor_admits(*attacker_id) {
@@ -971,7 +1084,6 @@ impl Simulation {
                 target,
                 destination,
             } => self.apply_megamission_command(
-                command_owner,
                 *entity_id,
                 MissionType::AttackMove,
                 *target,
@@ -981,7 +1093,6 @@ impl Simulation {
                 frame_effects,
             ),
             Command::Guard { entity_id, target } => self.apply_guard_command(
-                command_owner,
                 *entity_id,
                 *target,
                 rules,
@@ -2050,17 +2161,9 @@ impl Simulation {
 
     /// Check ownership using stable_id via EntityStore.
     ///
-    /// VERA-internal; the gamemd equivalent is that there ISN'T one. The
-    /// MEGAMISSION arm loads `Houses[event.house]` into EDI at
-    /// 0x004C6CBD-0x004C6CCA, then overwrites EDI with the resolved acting
-    /// object at 0x004C71D2 and never compares the two — there is no house test
-    /// anywhere in 0x004C71CA-0x004C74CA. So VERA is strict where retail is
-    /// permissive. The two agree today because commands execute on the issuing
-    /// tick and there is one local house; they would part company for a peer or
-    /// replayed event naming an object whose owner changed — capture or mind
-    /// control — between issue and execute, where retail still obeys the order
-    /// and VERA drops it. Kept because dropping it would let a malformed or
-    /// hostile envelope drive another house's units.
+    /// Used only by receivers whose contract includes an owner gate. The
+    /// MEGAMISSION receiver4C71CA..4C74CA resolves its actor independently of
+    /// the event house; its admission checks lifetime and tokens instead.
     pub(crate) fn entity_owned_by_id(&self, command_owner: &str, stable_id: u64) -> bool {
         self.substrate
             .entities
@@ -2253,7 +2356,6 @@ impl Simulation {
     /// clicked object does not blink. Risk: presentation only.
     fn apply_megamission_command(
         &mut self,
-        command_owner: &str,
         entity_id: u64,
         mission: MissionType,
         target: Option<combat::TargetKind>,
@@ -2262,9 +2364,8 @@ impl Simulation {
         overlay_registry: Option<&crate::rules::overlay_types::OverlayTypeRegistry>,
         frame_effects: FrameEffects<'_>,
     ) -> bool {
-        if !self.entity_owned_by_id(command_owner, entity_id) {
-            return false;
-        }
+        //4C71CA resolves the source independently of the issuer;4C71FE..721F
+        // checks actor lifetime. A capture after issue does not revoke an event.
         // Event4C7353 queues Move and clears Target before the class
         // applies its own refusal. Infantry51AA40 tests human Doing;
         // Unit741970 tests deployment after the same-Nav/force arm.
@@ -2354,16 +2455,12 @@ impl Simulation {
     /// existing AreaGuard4D6AA0 handler, including acquisition and return.
     fn apply_guard_command(
         &mut self,
-        command_owner: &str,
         entity_id: u64,
         target: Option<combat::TargetKind>,
         rules: Option<&RuleSet>,
         overlay_registry: Option<&crate::rules::overlay_types::OverlayTypeRegistry>,
         frame_effects: FrameEffects<'_>,
     ) -> bool {
-        if !self.entity_owned_by_id(command_owner, entity_id) {
-            return false;
-        }
         // Guard reaches the same MEGAMISSION arm as every other order — it
         // branches on mission 0x0B (Area_Guard) at 0x004C73EF — so it is subject
         // to the same admission gate, and the gate runs BEFORE anything is
@@ -2701,6 +2798,82 @@ mod tests {
     }
 
     #[test]
+    fn planning_and_attack_records_reach_the_native_command_decoder() {
+        let mut sim = Simulation::new();
+        let local = sim.interner.intern("Local");
+        sim.houses
+            .insert(local, HouseState::new(local, 0, None, true, 0, 10));
+        sim.session.house_order = vec![local];
+        sim.session.binary_frame = 77;
+        gsi_16_01_insert_identity_entity(&mut sim, 42, local);
+        for command in [
+            Command::Attack {
+                attacker_id: 42,
+                target_id: 43,
+            },
+            Command::ForceAttack {
+                attacker_id: 42,
+                target_id: 43,
+            },
+            Command::ForceAttackCell {
+                attacker_id: 42,
+                target_rx: 12,
+                target_ry: 15,
+            },
+            Command::AttackMove {
+                entity_id: 42,
+                target: Some(combat::TargetKind::Entity(43)),
+                destination: Some(combat::TargetKind::Cell(12, 15)),
+            },
+            Command::AttackMove {
+                entity_id: 42,
+                target: None,
+                destination: Some(combat::TargetKind::Entity(43)),
+            },
+        ] {
+            let record = sim.encode_megamission_record(local, &command).unwrap();
+            let decoded = sim.decode_native_command_record(&record, 900).unwrap();
+            assert_eq!(decoded.owner, local);
+            assert_eq!(decoded.execute_tick, 900);
+            let expected = match command {
+                Command::Attack {
+                    attacker_id,
+                    target_id,
+                } => Command::ForceAttack {
+                    attacker_id,
+                    target_id,
+                },
+                other => other,
+            };
+            assert_eq!(decoded.payload, expected);
+            for flag in [1, 2] {
+                let mut planned = record.clone();
+                planned.payload_mut()[22] = flag;
+                assert_eq!(
+                    sim.decode_native_command_record(&planned, 900)
+                        .unwrap()
+                        .payload,
+                    Command::PlanningRecord { record: planned }
+                );
+            }
+        }
+        for opcode in 0x2A..=0x2C {
+            let record = CommandRecord::encode(opcode, 0, 77, &[]).unwrap();
+            assert_eq!(
+                sim.decode_native_command_record(&record, 900)
+                    .unwrap()
+                    .payload,
+                Command::PlanningRecord { record }
+            );
+            let invalid_owner = CommandRecord::encode(opcode, -1, 77, &[]).unwrap();
+            assert!(
+                sim.decode_native_command_record(&invalid_owner, 900)
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
     fn scatter_event_resolves_the_registered_actor_in_the_native_decoder() {
         let mut sim = Simulation::new();
         let local = sim.interner.intern("Local");
@@ -2719,6 +2892,37 @@ mod tests {
         assert_eq!(decoded.owner, local);
         assert_eq!(decoded.execute_tick, 900);
         assert_eq!(decoded.payload, Command::Scatter { entity_id: 42 });
+    }
+
+    #[test]
+    fn decoded_move_executes_with_issuer_independent_of_actor_owner() {
+        let rules = amcv_move_rules();
+        let mut sim = Simulation::new();
+        let grid = PathGrid::new(40, 40);
+        sim.install_fixture_path_grid(Some(&grid));
+        spawn_rule_backed_unit(&mut sim, 1, "AMCV", &rules);
+        let issuer = sim.interner.intern("Issuer");
+        sim.houses
+            .insert(issuer, HouseState::new(issuer, 1, None, false, 0, 10));
+        sim.session.house_order = vec![issuer];
+        assert_ne!(sim.substrate.entities.get(1).unwrap().owner(), issuer);
+        let record = sim
+            .encode_megamission_record(
+                issuer,
+                &Command::Move {
+                    entity_id: 1,
+                    target_rx: 34,
+                    target_ry: 12,
+                },
+            )
+            .unwrap();
+        let decoded = sim.decode_native_command_record(&record, 1).unwrap();
+        assert_eq!(decoded.owner, issuer);
+        assert!(sim.apply_command("Issuer", &decoded.payload, Some(&rules)));
+        assert_eq!(
+            sim.substrate.entities.get(1).unwrap().navigation.nav_com(),
+            Some(crate::sim::components::NavTargetRef::cell(34, 12))
+        );
     }
 
     #[test]

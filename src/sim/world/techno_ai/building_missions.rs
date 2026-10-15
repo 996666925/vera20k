@@ -79,8 +79,7 @@
 //! - Dormant with retail data: the SAM arm (`0x0044AD07`, `SAM=` unset), the
 //!   upgrade arm (`0x0044B2BC`, no `PowersUpBuilding=`), Mission_Guard's
 //!   SuperWeapon gate (`0x00449716..0x00449753`, no armed type sets
-//!   `SuperWeapon=`), the waypoint-planning hook (`0x0044AFB1`, VERA has no
-//!   planning mode) and BuildingClass::SetTarget's TickTank/Artillary
+//!   `SuperWeapon=`) and BuildingClass::SetTarget's TickTank/Artillary
 //!   undeploy (`0x00443C07..0x00443C54`, neither key set).
 //!
 //! ## Dependency rules
@@ -858,6 +857,8 @@ fn attack_prelude(sim: &mut Simulation, id: u64, rules: &RuleSet) -> Option<(Tar
             crate::sim::world::FrameEffects::default(),
         );
         clear_support_count(sim, id);
+        //44AFA5..44AFB1: the warp-in readiness gate precedes705D60 ->6385C0.
+        sim.planning_enter_idle(id);
         if !waits(sim, id) {
             queue_and_commence(sim, id, MissionType::Guard, rules);
         }
@@ -901,6 +902,8 @@ fn attack_arm(
                 ctx.effects,
             );
             clear_support_count(sim, id);
+            //44B0F3..44B0FF: retain the Wait queued by planned dispatch.
+            sim.planning_enter_idle(id);
             if waits(sim, id) {
                 return 1;
             }

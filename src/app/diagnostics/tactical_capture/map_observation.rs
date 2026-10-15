@@ -85,6 +85,14 @@ enum MapMouseButton {
     Right,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum MapKeyEdge {
+    Pressed,
+    Repeat,
+    Released,
+}
+
 /// A complete local input gesture between exact steps. Mouse coordinates are
 /// render-target pixels; key names are literal keys, never command identities.
 /// No render sees a synthetic held button or key. Omitted mouse buttons retain
@@ -122,6 +130,13 @@ enum MapGesture {
     },
     Key {
         key: String,
+        /// Separate edges are accepted only for the production planning key.
+        #[serde(
+            default,
+            deserialize_with = "deserialize_present",
+            skip_serializing_if = "Option::is_none"
+        )]
+        edge: Option<MapKeyEdge>,
         #[serde(
             default,
             deserialize_with = "deserialize_present",
@@ -146,7 +161,7 @@ impl MapGesture {
     }
 
     fn is_quickload(&self) -> bool {
-        matches!(self, Self::Key { key, modifiers: Some(modifiers) }
+        matches!(self, Self::Key { key, modifiers: Some(modifiers), .. }
             if key.eq_ignore_ascii_case("N") && modifiers.len() == 2
                 && modifiers.iter().any(|m| m == "Ctrl") && modifiers.iter().any(|m| m == "Shift"))
     }
@@ -623,7 +638,7 @@ impl MapCaptureProfile {
                     | MapSidebarTarget::Sell {} => {}
                 }
             }
-            if let MapGesture::Key { key, modifiers } = &gesture.gesture {
+            if let MapGesture::Key { key, modifiers, .. } = &gesture.gesture {
                 literal_key(key)?;
                 literal_modifiers(modifiers.as_deref().unwrap_or_default())?;
             }
@@ -961,8 +976,18 @@ struct MapInputObservation {
     selection_pending: bool,
     target_line_remaining: i32,
     target_line_active: bool,
+    planning_active: bool,
+    planning_paths: Vec<MapPlanningPath>,
     #[serde(skip_serializing_if = "Option::is_none")]
     local_input: Option<MapLocalInputObservation>,
+}
+
+#[derive(Debug, Serialize)]
+struct MapPlanningPath {
+    actor_id: u64,
+    cells: Vec<(u16, u16)>,
+    loop_start: Option<usize>,
+    editing: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -1152,12 +1177,30 @@ impl MapInputObservation {
             selection_pending: state.match_state.input.selection_order_pending,
             target_line_remaining: lines.remaining_frames(sim.session.binary_frame),
             target_line_active: lines.is_selected_action_active(sim.session.binary_frame),
+            planning_active: state.match_state.input.planning.active(),
+            planning_paths: sim.session.current_house().map_or_else(Vec::new, |owner| {
+                sim.planning_paths(owner)
+                    .into_iter()
+                    .map(|path| MapPlanningPath {
+                        actor_id: path.actor_id,
+                        cells: path.cells,
+                        loop_start: path.loop_start,
+                        editing: path.editing,
+                    })
+                    .collect()
+            }),
             local_input: local_input.then(|| MapLocalInputObservation::capture(state, sim)),
         })
     }
 
     fn sample_count(&self) -> usize {
         self.selected_ids.len()
+            + self.planning_paths.len()
+            + self
+                .planning_paths
+                .iter()
+                .map(|path| path.cells.len())
+                .sum::<usize>()
             + self.local_input.as_ref().map_or(0, |input| {
                 input.selection_voice_requests.len()
                     + 1
@@ -1471,10 +1514,17 @@ struct MapKeyboardGestureReceipt {
     binding_command: Option<&'static str>,
     press_held: bool,
     release_cleared: bool,
+    planning_before: bool,
+    planning_after: bool,
 }
 
 impl MapKeyboardGestureReceipt {
-    fn dispatch(state: &mut AppState, key: &str, modifiers: &[String]) -> Result<Self> {
+    fn dispatch(
+        state: &mut AppState,
+        key: &str,
+        modifiers: &[String],
+        key_edge: Option<MapKeyEdge>,
+    ) -> Result<Self> {
         use crate::app::input::hotkeys::{self, HotkeyResolution};
         use crate::app::input::keyboard::{InGameKeyEdge, in_game_key_edge};
         use winit::event::ElementState;
@@ -1486,6 +1536,7 @@ impl MapKeyboardGestureReceipt {
             "key gesture requires ordinary unpaused in-game input"
         );
         let (physical, logical) = literal_key(key)?;
+        let planning_before = state.match_state.input.planning.active();
         let modifier_keys = literal_modifiers(modifiers)?;
         let modifier_edge = |state: &mut AppState, code, pressed| {
             hotkeys::record_modifier_key(
@@ -1508,6 +1559,13 @@ impl MapKeyboardGestureReceipt {
             location,
             state.match_state.input.hotkey_modifiers,
         );
+        if key_edge.is_some() {
+            ensure!(
+                resolution == HotkeyResolution::Command(hotkeys::HotkeyCommand::PlanningMode)
+                    || state.match_state.input.planning.owns_key(physical),
+                "separate key edges require the production planning binding or its owned release"
+            );
+        }
         let binding_command = match resolution {
             HotkeyResolution::Command(command) => hotkeys::catalog::registered_commands()
                 .iter()
@@ -1515,7 +1573,7 @@ impl MapKeyboardGestureReceipt {
                 .map(|metadata| metadata.ini_name),
             _ => None,
         };
-        let edge = |state: &mut AppState, pressed| {
+        let edge = |state: &mut AppState, pressed, repeat| {
             in_game_key_edge(
                 state,
                 InGameKeyEdge {
@@ -1524,21 +1582,32 @@ impl MapKeyboardGestureReceipt {
                     unmodified: &logical,
                     location,
                     state: pressed,
-                    repeat: false,
+                    repeat,
                 },
                 false,
                 false,
             )
         };
-        edge(state, ElementState::Pressed);
+        if key_edge != Some(MapKeyEdge::Released) {
+            edge(
+                state,
+                ElementState::Pressed,
+                key_edge == Some(MapKeyEdge::Repeat),
+            );
+        }
         let press_held = state.match_state.input.keys_held.contains(&physical);
-        edge(state, ElementState::Released);
+        if key_edge.is_none() || key_edge == Some(MapKeyEdge::Released) {
+            edge(state, ElementState::Released, false);
+        }
         let release_cleared = !state.match_state.input.keys_held.contains(&physical);
         for code in modifier_keys.iter().rev() {
             modifier_edge(state, *code, false);
         }
         ensure!(
-            press_held && release_cleared && state.match_state.input.hotkey_modifiers.is_empty(),
+            (key_edge == Some(MapKeyEdge::Released) || press_held)
+                && (matches!(key_edge, Some(MapKeyEdge::Pressed | MapKeyEdge::Repeat))
+                    || release_cleared)
+                && state.match_state.input.hotkey_modifiers.is_empty(),
             "key gesture did not traverse ordinary held-key edges"
         );
         ensure!(
@@ -1552,6 +1621,8 @@ impl MapKeyboardGestureReceipt {
             binding_command,
             press_held,
             release_cleared,
+            planning_before,
+            planning_after: state.match_state.input.planning.active(),
         })
     }
 }
@@ -2683,7 +2754,12 @@ impl TacticalCaptureSession {
                 sidebar,
                 keyboard,
                 command_bar,
-            ) = if let MapGesture::Key { key, modifiers } = &scheduled.gesture {
+            ) = if let MapGesture::Key {
+                key,
+                modifiers,
+                edge,
+            } = &scheduled.gesture
+            {
                 (
                     false,
                     None,
@@ -2693,6 +2769,7 @@ impl TacticalCaptureSession {
                         state,
                         key,
                         modifiers.as_deref().unwrap_or_default(),
+                        *edge,
                     )?),
                     None,
                 )
@@ -4180,6 +4257,8 @@ mod tests {
             selection_pending: true,
             target_line_remaining: 0,
             target_line_active: false,
+            planning_active: false,
+            planning_paths: Vec::new(),
             local_input: Some(MapLocalInputObservation {
                 camera_top_left: [0.0, 0.0],
                 camera_zoom: 1.0,
@@ -5056,6 +5135,8 @@ mod tests {
             selection_pending: false,
             target_line_remaining: 0,
             target_line_active: false,
+            planning_active: false,
+            planning_paths: Vec::new(),
             local_input: None,
         };
         for ordinal in 0..2 {
@@ -5456,6 +5537,8 @@ mod tests {
             selection_pending: false,
             target_line_remaining: 0,
             target_line_active: false,
+            planning_active: false,
+            planning_paths: Vec::new(),
             local_input: None,
         });
         assert!(map.observe_frame(large, BTreeSet::new()).is_err());

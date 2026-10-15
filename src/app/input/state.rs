@@ -156,6 +156,7 @@ impl PreparedSavedLocalView {
             .view_bookmarks
             .restore_saved_cells(self.saved.view_bookmarks());
         let modes = self.saved.modes();
+        input.planning.restore_active(modes.planning);
         sidebar.repair_mode_on = modes.repair;
         sidebar.sell_mode_on = modes.sell;
         input.targeting_mode = self.targeting;
@@ -211,6 +212,7 @@ pub(crate) struct MatchInputState {
     pub(crate) hotkey_modifiers: ModifiersState,
     /// Hybrid held/tap state for the retail TypeSelect command.
     pub(crate) type_select: crate::app::types::TypeSelectInputState,
+    pub(crate) planning: crate::app::input::planning_mode::PlanningInputState,
     pub(crate) category_navigation:
         crate::app::input::dispatch::selection_navigation::CategoryNavigation,
     /// Original CursorCheat toggle A8F7D8, consumed by tactical tooltips.
@@ -288,6 +290,7 @@ impl MatchInputState {
             hotkey_bindings,
             hotkey_modifiers: ModifiersState::empty(),
             type_select: crate::app::types::TypeSelectInputState::default(),
+            planning: Default::default(),
             category_navigation: Default::default(),
             cursor_coordinates: false,
             retail_screenshot_requested: false,
@@ -459,6 +462,7 @@ impl MatchInputState {
 
     /// New-scenario installation discards references into the outgoing world.
     pub(crate) fn reset_targeting_for_new_world(&mut self) {
+        self.planning.reset();
         self.targeting_mode = None;
         self.building_placement_preview = None;
         self.saved_building_placement = None;
@@ -508,6 +512,8 @@ impl MatchInputState {
     /// owned by ordinary press/release delivery, not this bounded receipt.
     pub(crate) fn clear_command_latches(&mut self) {
         self.type_select.clear_held();
+        // A command-latch clear does not end the local planning mode. Keep
+        // its physical release owner so an input lock cannot strand paths.
         self.queued_order_mode = crate::app::types::OrderMode::Move;
     }
 
@@ -559,6 +565,7 @@ impl MatchInputState {
             SavedCursorModes {
                 repair: sidebar.repair_mode_on,
                 sell: sidebar.sell_mode_on,
+                planning: self.planning.active(),
                 targeting,
             },
         )

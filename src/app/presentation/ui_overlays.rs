@@ -1847,7 +1847,7 @@ fn active_cursor_sequence(state: &AppState) -> Option<(CursorId, &SoftwareCursor
 pub(crate) fn static_default_cursor(state: &AppState) -> bool {
     state.use_software_cursor()
         && active_cursor_sequence(state)
-            .is_some_and(|(id, sequence)| id == CursorId::Default && sequence.frames.len() == 1)
+            .is_some_and(|(id, sequence)| id == CursorId::Default && sequence.interval_ms == 0)
 }
 
 pub(crate) fn build_software_cursor_instances(state: &AppState) -> Vec<SpriteInstance> {
@@ -1857,7 +1857,15 @@ pub(crate) fn build_software_cursor_instances(state: &AppState) -> Vec<SpriteIns
     let Some((id, sequence)) = active_cursor_sequence(state) else {
         return Vec::new();
     };
-    let Some(frame) = software_cursor_frame_for(id, sequence) else {
+    let frame = if id == CursorId::Default
+        && crate::app::input::planning_mode::node_at_cursor(state).is_some()
+    {
+        //63AC41..4E selects row0's static small frame when only hovering.
+        sequence.frames.get(1)
+    } else {
+        software_cursor_frame_for(id, sequence)
+    };
+    let Some(frame) = frame else {
         return Vec::new();
     };
     // Cursor rendering: the hotspot pixel must sit exactly at the OS cursor position.

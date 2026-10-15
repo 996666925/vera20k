@@ -289,7 +289,10 @@ def _gesture(value: Any, label: str, extent: tuple[int, int]) -> None:
         if start == end:
             raise ValidationError(f'{label} drag endpoints must differ')
     elif gesture.get('kind') == 'key':
-        require_exact_keys(gesture, ('kind', 'key', *(('modifiers',) if 'modifiers' in gesture else ())), label)
+        require_exact_keys(gesture, ('kind', 'key', *(('modifiers',) if 'modifiers' in gesture else ()),
+                                    *(('edge',) if 'edge' in gesture else ())), label)
+        if 'edge' in gesture and gesture['edge'] not in ('pressed', 'repeat', 'released'):
+            raise ValidationError(f'{label}.edge must be pressed, repeat or released')
         key = require_string(gesture['key'], f'{label}.key')
         if key != 'Escape' and not (len(key) == 1 and key.isascii() and key.isalnum()):
             raise ValidationError(f'{label}.key must be one ASCII letter/digit or Escape')
@@ -492,6 +495,7 @@ def _profile_extensions(profile: Mapping[str, Any], *, production_commands: bool
         extent = tuple(_bounded_int(profile.get(key), f'profile.{key}', 1, (1 << 32) - 1)
                        for key in ('width', 'height'))
         previous = 0
+        held_planning_keys = set()
         for index, value in enumerate(gestures):
             label = f'profile.gestures[{index}]'
             row = require_object(value, label)
@@ -501,8 +505,23 @@ def _profile_extensions(profile: Mapping[str, Any], *, production_commands: bool
                 raise ValidationError(f'{label}.issue_after_step must be ordered before the final step')
             previous = step
             _gesture(row['gesture'], f'{label}.gesture', extent)
+            gesture = row['gesture']
+            if gesture.get('kind') == 'key' and 'edge' in gesture:
+                key = gesture['key'].upper()
+                edge = gesture['edge']
+                if edge == 'pressed':
+                    if key in held_planning_keys:
+                        raise ValidationError(f'{label} planning key already held')
+                    held_planning_keys.add(key)
+                else:
+                    if key not in held_planning_keys:
+                        raise ValidationError(f'{label} planning edge has no prior press')
+                    if edge == 'released':
+                        held_planning_keys.remove(key)
             if _is_quickload(row['gesture']) and not profile.get('allow_load_segments', False):
                 raise ValidationError('literal quickload requires allow_load_segments')
+        if held_planning_keys:
+            raise ValidationError('profile ends with a planning key held')
     if 'observe_sidebar_steps' in profile:
         steps = require_array(profile['observe_sidebar_steps'], 'profile.observe_sidebar_steps')
         if len(steps) > 1024:
@@ -1608,7 +1627,29 @@ def _local_input_observation(value: Any, label: str) -> int:
 def _input_observation(value: Any, label: str, *, local_input: bool = False) -> int:
     row = require_object(value, label)
     require_exact_keys(row, ('selected_ids', 'selection_pending', 'target_line_remaining',
-                             'target_line_active', *(('local_input',) if local_input else ())), label)
+                             'target_line_active', *(('planning_active', 'planning_paths') if 'planning_active' in row else ()),
+                             *(('local_input',) if local_input else ())), label)
+    planning_samples = 0
+    if 'planning_active' in row:
+        if type(row['planning_active']) is not bool:
+            raise ValidationError(f'{label}.planning_active must be boolean')
+        for index, path in enumerate(require_array(row['planning_paths'], f'{label}.planning_paths')):
+            name = f'{label}.planning_paths[{index}]'
+            path = require_object(path, name)
+            require_exact_keys(path, ('actor_id', 'cells', 'loop_start', 'editing'), name)
+            _bounded_int(path['actor_id'], f'{name}.actor_id', 1, (1 << 64) - 1)
+            cells = require_array(path['cells'], f'{name}.cells')
+            planning_samples += 1 + len(cells)
+            for number, cell in enumerate(cells):
+                pair = require_array(cell, f'{name}.cells[{number}]')
+                if len(pair) != 2:
+                    raise ValidationError(f'{name}.cell requires two coordinates')
+                for value in pair:
+                    _bounded_int(value, f'{name}.cell', 0, 65535)
+            if path['loop_start'] is not None:
+                _bounded_int(path['loop_start'], f'{name}.loop_start', 0, len(cells) - 1)
+            if type(path['editing']) is not bool:
+                raise ValidationError(f'{name}.editing must be boolean')
     selected = require_array(row['selected_ids'], f'{label}.selected_ids')
     for index, identity in enumerate(selected):
         _bounded_int(identity, f'{label}.selected_ids[{index}]', 1, (1 << 64) - 1)
@@ -1621,8 +1662,11 @@ def _input_observation(value: Any, label: str, *, local_input: bool = False) -> 
                              -(1 << 31), (1 << 31) - 1)
     if row['target_line_active'] and remaining <= 0:
         raise ValidationError(f'{label}.target_line_active requires positive remaining frames')
-    return len(selected) + (_local_input_observation(row['local_input'], f'{label}.local_input')
-                            if local_input else 0)
+    samples = planning_samples + len(selected) + (_local_input_observation(row['local_input'], f'{label}.local_input')
+                                                  if local_input else 0)
+    if samples > MAX_OBSERVATION_SAMPLES:
+        raise ValidationError(f'{label} exceeds its retained sample budget')
+    return samples
 
 
 def _sidebar_observation(value: Any, label: str) -> int:
@@ -2124,15 +2168,24 @@ def _gesture_observations(value: Any, profile: Mapping[str, Any], segments=()) -
             key_label = f'{row_label}.keyboard'
             receipt = require_object(row['keyboard'], key_label)
             require_exact_keys(receipt, ('encoded_key', 'binding_command', 'press_held',
-                                        'release_cleared'), key_label)
+                                        'release_cleared', *(('planning_before', 'planning_after') if 'planning_before' in receipt else ())), key_label)
             _bounded_int(receipt['encoded_key'], f'{key_label}.encoded_key', 1, (1 << 16) - 1)
             if receipt['binding_command'] is not None and not require_string(
                     receipt['binding_command'], f'{key_label}.binding_command'):
                 raise ValidationError(f'{key_label}.binding_command is empty')
             if receipt['binding_command'] is not None and receipt['binding_command'] not in seen_commands:
                 raise ValidationError(f'{key_label}.binding_command is absent from registered bindings')
-            for field in ('press_held', 'release_cleared'):
-                require_value(receipt[field], True, f'{key_label}.{field}')
+            edge = request['gesture'].get('edge')
+            if edge != 'released':
+                require_value(receipt['press_held'], True, f'{key_label}.press_held')
+            require_value(receipt['release_cleared'], edge not in ('pressed', 'repeat'), f'{key_label}.release_cleared')
+            if 'planning_before' in receipt:
+                for field in ('planning_before', 'planning_after'):
+                    if type(receipt[field]) is not bool:
+                        raise ValidationError(f'{key_label}.{field} must be boolean')
+            if edge is not None:
+                require_value(receipt['binding_command'], 'PlanningMode', f'{key_label}.binding_command')
+                require_value(receipt['planning_after'], edge != 'released', f'{key_label}.planning_after')
         commands = require_array(row['queued_commands'], f'{row_label}.queued_commands')
         sample_count += len(commands)
         for number, value in enumerate(commands):

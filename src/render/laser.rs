@@ -66,11 +66,11 @@ impl LaserDraw {
                 }
                 SurfaceLineBlend::Add(scaled)
             } else {
-                // RGBClass6612C0: signed division toward zero, low byte of
-                // interpolation argument. Here the destination is white.
-                let rgb = rgb.map(|v| {
-                    (i32::from(v) + (255 - i32::from(v)) * i32::from(toward_white) / 256) as u8
-                });
+                let rgb = crate::render::native_surface_format::interpolate_rgb8(
+                    rgb,
+                    [255; 3],
+                    u32::from(toward_white),
+                );
                 SurfaceLineBlend::Replace(
                     crate::render::native_surface_format::RGB565.pack_rgb8(rgb),
                 )

@@ -13,6 +13,7 @@ pub(crate) mod hotkeys;
 pub(crate) mod in_game_options;
 pub(crate) mod messages;
 pub(crate) mod pause_menu;
+pub(crate) mod planning_mode;
 pub(crate) mod sidebar_eva;
 pub(crate) mod state;
 pub(crate) mod tooltips;

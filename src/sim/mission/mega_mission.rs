@@ -75,6 +75,17 @@ impl MegaMission {
         self.attack_move
     }
 
+    /// Planning renderer's Foot getters (vt+0x4B0/0x4B8,
+    /// 4DF1D0/4DF1F0): preserve the acquired-target latch and prefer the
+    /// MegaDestination token, then MegaTarget. Coordinate resolution stays
+    /// with the shared TargetClass coordinate owner.
+    pub(crate) fn planning_draw_target(&self) -> (bool, Option<TargetKind>) {
+        (
+            self.have_attack_move_target,
+            self.destination.or(self.target),
+        )
+    }
+
     /// MegaDestination.
     #[cfg(test)]
     pub(crate) fn destination(&self) -> Option<TargetKind> {

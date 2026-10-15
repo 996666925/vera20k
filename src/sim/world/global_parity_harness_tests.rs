@@ -884,6 +884,11 @@ fn seed_scenario(sim: &mut Simulation, rules: &RuleSet, overlays: &OverlayTypeRe
 }
 
 /// Scripted commands keyed by `execute_tick` (fires when tick+1 == execute_tick).
+/// The former frame120 Allied-issued Move for Soviet tank6 was rejected by
+/// VERA's issuer gate, so it never affected this duel's pinned transitions.
+/// Native Event4C71CA accepts that actor independently of the issuer. Its
+/// execution and replay are covered separately below, preserving this fixture's
+/// Stop/retaliation/expiry coverage instead of silently changing its scenario.
 fn harness_script() -> Vec<(u64, Command)> {
     vec![
         (
@@ -903,14 +908,6 @@ fn harness_script() -> Vec<(u64, Command)> {
                     38 + HARNESS_COORD_SHIFT,
                     8 + HARNESS_COORD_SHIFT,
                 )),
-            },
-        ),
-        (
-            120,
-            Command::Move {
-                entity_id: 6,
-                target_rx: 28 + HARNESS_COORD_SHIFT,
-                target_ry: 10 + HARNESS_COORD_SHIFT,
             },
         ),
         (300, Command::Stop { entity_id: 4 }),
@@ -934,6 +931,79 @@ fn due_commands(sim: &Simulation, script: &[(u64, Command)], tick: u64) -> Vec<C
         .filter(|(t, _)| *t == tick + 1)
         .map(|(t, c)| CommandEnvelope::new(owner, *t, c.clone()))
         .collect()
+}
+
+#[test]
+fn cross_house_move_executes_and_replays_without_changing_actor_owner() {
+    let rules = harness_rules();
+    let overlays = harness_overlays();
+    let grid = PathGrid::new(HARNESS_CELL_SIDE, HARNESS_CELL_SIDE);
+    let mut recorded = Simulation::with_seed(HARNESS_SEED);
+    seed_scenario(&mut recorded, &rules, &overlays);
+    let actor_owner = recorded.substrate.entities.get(6).unwrap().owner();
+    let issuer = recorded.interner.get("Americans").unwrap();
+    assert_ne!(actor_owner, issuer);
+    let destination = (28 + HARNESS_COORD_SHIFT, 10 + HARNESS_COORD_SHIFT);
+    let command = CommandEnvelope::new(
+        issuer,
+        1,
+        Command::Move {
+            entity_id: 6,
+            target_rx: destination.0,
+            target_ry: destination.1,
+        },
+    );
+    let mut replay = ReplayLog::new(ReplayHeader {
+        version: 1,
+        pixel_conversion_bounds: recorded.session.pixel_conversion_bounds,
+        tick_hz: 15,
+        seed: HARNESS_SEED,
+        map_name: "cross_house_move".into(),
+        rules_hash: 0,
+    });
+    let result = recorded.advance_tick(
+        std::slice::from_ref(&command),
+        Some(&rules),
+        Some(&grid),
+        Some(&overlays),
+        HARNESS_TICK_MS,
+    );
+    assert_eq!(
+        recorded
+            .substrate
+            .entities
+            .get(6)
+            .unwrap()
+            .navigation
+            .nav_com(),
+        Some(crate::sim::components::NavTargetRef::cell(
+            destination.0,
+            destination.1
+        ))
+    );
+    replay.record_tick(0, vec![command], result.state_hash);
+    let replay: ReplayLog = serde_json::from_slice(&serde_json::to_vec(&replay).unwrap()).unwrap();
+    let mut restored = Simulation::with_seed(HARNESS_SEED);
+    seed_scenario(&mut restored, &rules, &overlays);
+    let hashes = ReplayRunner::run_fixture_with_overlay_registry(
+        &mut restored,
+        &replay,
+        Some(&rules),
+        Some(&grid),
+        Some(&overlays),
+        HARNESS_TICK_MS,
+    );
+    assert_eq!(hashes, vec![result.state_hash]);
+    assert_eq!(restored.state_hash(), recorded.state_hash());
+    let actor = restored.substrate.entities.get(6).unwrap();
+    assert_eq!(actor.owner(), actor_owner);
+    assert_eq!(
+        actor.navigation.nav_com(),
+        Some(crate::sim::components::NavTargetRef::cell(
+            destination.0,
+            destination.1
+        ))
+    );
 }
 
 #[test]

@@ -26,6 +26,8 @@ use crate::map::terrain::TilePlacement;
 use crate::map::theater::TileKey;
 use crate::render::batch::SpriteInstance;
 use crate::ui::sidebar::SidebarView;
+#[path = "planning_lines.rs"]
+mod planning_lines;
 
 // ---------------------------------------------------------------------------
 // Phase structs — group related instance vectors for clean data flow
@@ -622,20 +624,25 @@ pub(super) fn build_ui_instances(state: &AppState, sw: f32, sh: f32) -> UiInstan
     };
     // Shared native logical viewport; both overlays scale the raster before
     // the UI passthrough draw, so fractional zoom cannot pad individual pixels.
-    let target_line = crate::app::presentation::target_lines::build_target_line_instances(
-        &state.match_state.match_presentation.target_lines,
-        state
-            .match_state
-            .sim_runtime
-            .as_ref()
-            .map(|rt| &rt.simulation),
-        state.rules(),
-        state
-            .process_assets
-            .manager()
-            .and_then(|assets| assets.get_ref("palette.pal")),
-        view,
+    let (mut target_line, planning_highlights) = planning_lines::build(state, view);
+    target_line.extend(
+        crate::app::presentation::target_lines::build_target_line_instances(
+            &state.match_state.match_presentation.target_lines,
+            state.match_state.input.planning.active(),
+            state
+                .match_state
+                .sim_runtime
+                .as_ref()
+                .map(|rt| &rt.simulation),
+            state.rules(),
+            state
+                .process_assets
+                .manager()
+                .and_then(|assets| assets.get_ref("palette.pal")),
+            view,
+        ),
     );
+    target_line.extend(planning_highlights);
     let selected = crate::app::input::dispatch::selected_stable_ids_in_order(
         state
             .match_state

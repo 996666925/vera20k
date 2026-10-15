@@ -4,6 +4,18 @@
 //! surface descriptor. The known RGB565/RGB555 values here are fixtures for
 //! verified branches, while the struct remains runtime-format-shaped.
 
+/// RGBClass::Adjust6612C0 interpolates each encoded channel using the low
+/// byte of the argument and signed division toward zero, not an arithmetic
+/// shift. Shared by Laser550C21 and PlanNode635830/635A40/635C10.
+pub(crate) fn interpolate_rgb8(source: [u8; 3], target: [u8; 3], amount: u32) -> [u8; 3] {
+    let amount = i32::from(amount as u8);
+    std::array::from_fn(|channel| {
+        let source = i32::from(source[channel]);
+        let target = i32::from(target[channel]);
+        (source + (target - source) * amount / 256) as u8
+    })
+}
+
 /// Runtime-derived component layout for one native DirectDraw surface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DirectDrawPixelFormat {
@@ -151,6 +163,26 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
+
+    #[test]
+    fn encoded_rgb_interpolation_matches_original_executed_controls() {
+        let corpus: serde_json::Value = serde_json::from_str(crate::test_fixture::text(
+            "tools/spatial_oracle/planning_mode.json",
+        ))
+        .unwrap();
+        for row in corpus["render"]["rgb_controls"].as_array().unwrap() {
+            let rgb = |field: &str| std::array::from_fn(|i| row[field][i].as_u64().unwrap() as u8);
+            assert_eq!(
+                interpolate_rgb8(
+                    rgb("source"),
+                    rgb("target"),
+                    row["amount"].as_u64().unwrap() as u32
+                ),
+                rgb("rgb"),
+                "{row}"
+            );
+        }
+    }
 
     #[test]
     fn active_profile_exhaustively_uses_guard_observed_channel_indices() {

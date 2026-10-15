@@ -43,6 +43,31 @@ use serde_json::{Value, json};
 /// `ScoldSound=`.
 const SOUNDS: [(i64, &str); 2] = [(42, "OracleClick"), (43, "OracleScold")];
 
+fn rules_with_fixed_sounds(root: IniFile, sounds: IniFile) -> RuleSet {
+    let mut owner = crate::rules::process_owner::NativeRulesProcessOwner::from_cold_start_sources(
+        root,
+        None,
+        IniFile::empty(),
+        std::sync::Arc::new(crate::rules::sound_ini::SoundRegistry::from_ini(&sounds)),
+    )
+    .unwrap();
+    owner
+        .load_scenario(
+            crate::rules::process_owner::NativeScenarioRulesPrefix::NonCampaign(None),
+            &IniFile::empty(),
+        )
+        .unwrap()
+        .into_parts()
+        .0
+}
+
+fn oracle_rules_with_sounds(root: IniFile) -> RuleSet {
+    rules_with_fixed_sounds(
+        root,
+        IniFile::from_str("[SoundList]\n0=OracleClick\n1=OracleScold\n"),
+    )
+}
+
 fn corpus() -> Value {
     serde_json::from_str(crate::test_fixture::text(
         "tools/spatial_oracle/building_repair.json",
@@ -181,14 +206,11 @@ fn the_repair_step_cost_matches_the_original() {
 /// `BuildingClass::ToggleRepair @ 0x00446FF0` over the controls VERA issues.
 #[test]
 fn toggle_repair_matches_the_original() {
-    let rules = RuleSet::from_ini(&IniFile::from_str(&format!(
-        // VERA's rules reader reads `[AudioVisual]` sounds only with a
-        // non-empty `[General]` section.
+    let rules = oracle_rules_with_sounds(IniFile::from_str(&format!(
         "[General]\nFixtureOnly=1\n[AudioVisual]\nGenericClick={}\nScoldSound={}\n[InfantryTypes]\n\
          [VehicleTypes]\n[AircraftTypes]\n[BuildingTypes]\n0=YAREFN\n[YAREFN]\nStrength=1000\n",
         SOUNDS[0].1, SOUNDS[1].1
-    )))
-    .unwrap();
+    )));
     let mut compared = 0;
     for row in corpus()["toggle"].as_array().unwrap() {
         let input = &row["input"];
@@ -249,7 +271,7 @@ fn toggle_repair_matches_the_original() {
 fn update_scene(corpus: &Value, input: &Value) -> (Simulation, RuleSet, Option<u64>) {
     let int = |key: &str, default: i64| input[key].as_i64().unwrap_or(default) as i32;
     let flag = |key: &str, default: bool| input[key].as_bool().unwrap_or(default);
-    let rules = RuleSet::from_ini(&IniFile::from_str(&format!(
+    let rules = oracle_rules_with_sounds(IniFile::from_str(&format!(
         "[General]\nRepairStep=8\nRepairPercent=15%\nRepairRate=.016\n[AI]\nCreditReserve={}\n\
          [IQ]\nRepairSell=1\nSellBack=2\n[AudioVisual]\nConditionYellow=50%\nConditionRed=25%\n\
          GenericClick={}\nScoldSound={}\n[InfantryTypes]\n[VehicleTypes]\n[AircraftTypes]\n\
@@ -263,8 +285,7 @@ fn update_scene(corpus: &Value, input: &Value) -> (Simulation, RuleSet, Option<u
         SOUNDS[1].1,
         int("cost", 2500),
         yes_no(flag("click_repairable", true)),
-    )))
-    .unwrap();
+    )));
     assert_eq!(
         rules.general.repair_percent.to_bits(),
         constant(corpus, "percent_15")
@@ -643,7 +664,10 @@ fn retail_repair_keys_read_as_the_oracle_writes_them() {
     let Some(ini) = crate::rules::retail_ini_fixture::retail_ini("rulesmd.ini") else {
         return;
     };
-    let rules = RuleSet::from_ini(&ini).unwrap();
+    let Some(soundmd) = crate::rules::retail_ini_fixture::retail_ini("soundmd.ini") else {
+        return;
+    };
+    let rules = rules_with_fixed_sounds(ini, soundmd);
     assert_eq!(rules.general.repair_step, 8);
     assert_eq!(
         rules.general.repair_percent.to_bits(),

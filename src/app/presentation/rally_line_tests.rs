@@ -913,6 +913,7 @@ fn production_rally_workload_timing() {
             let begin = Instant::now();
             let actual = build_target_line_instances(
                 &line_state,
+                false,
                 Some(&sim),
                 rules.as_ref(),
                 Some(&palette),

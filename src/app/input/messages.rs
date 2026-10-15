@@ -94,6 +94,16 @@ fn trigger_message_rgb(
 
 /// Post the localized, silent HUD result of one executed TypeSelect tap.
 pub(crate) fn post_type_select_feedback(state: &mut AppState, csf_key: &str) {
+    post_silent_house_feedback(state, csf_key, TYPE_SELECT_MESSAGE_TIMEOUT_MS);
+}
+
+///63A0D0/639FD0 use the same silent730A90 HUD owner with duration1E0.
+/// Their separate ScoldSound belongs to the planning input owner.
+pub(crate) fn post_planning_refusal(state: &mut AppState, csf_key: &str) {
+    post_silent_house_feedback(state, csf_key, 0x1E0 * 16);
+}
+
+fn post_silent_house_feedback(state: &mut AppState, csf_key: &str, timeout_ms: u64) {
     sync_view(state);
     let now = message_now_ms(state);
     let rgb = type_select_message_rgb(
@@ -103,11 +113,12 @@ pub(crate) fn post_type_select_feedback(state: &mut AppState, csf_key: &str) {
     );
     let font = &state.renderer.bit_font;
     let measure = |s: &str| font.text_width(s) as i32;
-    let outcome = add_type_select_feedback(
+    let outcome = add_silent_house_feedback(
         &mut state.match_state.match_presentation.message_list,
         state.process_assets.csf.as_ref(),
         csf_key,
         rgb,
+        timeout_ms,
         now,
         &measure,
     );
@@ -117,11 +128,32 @@ pub(crate) fn post_type_select_feedback(state: &mut AppState, csf_key: &str) {
     );
 }
 
+#[cfg(test)]
 fn add_type_select_feedback(
     list: &mut crate::ui::messages::MessageList,
     csf: Option<&crate::assets::csf_file::CsfFile>,
     csf_key: &str,
     rgb: [f32; 3],
+    now_ms: u64,
+    measure: &dyn Fn(&str) -> i32,
+) -> crate::ui::messages::AddOutcome {
+    add_silent_house_feedback(
+        list,
+        csf,
+        csf_key,
+        rgb,
+        TYPE_SELECT_MESSAGE_TIMEOUT_MS,
+        now_ms,
+        measure,
+    )
+}
+
+fn add_silent_house_feedback(
+    list: &mut crate::ui::messages::MessageList,
+    csf: Option<&crate::assets::csf_file::CsfFile>,
+    csf_key: &str,
+    rgb: [f32; 3],
+    timeout_ms: u64,
     now_ms: u64,
     measure: &dyn Fn(&str) -> i32,
 ) -> crate::ui::messages::AddOutcome {
@@ -133,7 +165,7 @@ fn add_type_select_feedback(
             prefix: None,
             text: text.as_ref(),
             rgb,
-            timeout_ms: Some(TYPE_SELECT_MESSAGE_TIMEOUT_MS),
+            timeout_ms: Some(timeout_ms),
             silent: true,
         },
         now_ms,

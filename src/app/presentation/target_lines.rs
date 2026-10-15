@@ -115,11 +115,18 @@ impl TargetLineState {
 /// Build selected unit action-line instances from live simulation state.
 pub(crate) fn build_target_line_instances(
     line_state: &TargetLineState,
+    planning_active: bool,
     sim: Option<&Simulation>,
     rules: Option<&RuleSet>,
     palette_bytes: Option<&[u8]>,
     viewport: TacticalViewport,
 ) -> Vec<SpriteInstance> {
+    // Tactical6D4729..6D472F skips selected Foot4DC060 while PlanMgr is
+    // active. Otherwise its solid strokes cover the animated planning path.
+    // Native controls: action_lines.json::tactical_gate_cases (gate_14/15).
+    if planning_active {
+        return Vec::new();
+    }
     let Some(sim) = sim else {
         return Vec::new();
     };
@@ -527,7 +534,7 @@ fn emit_rally_line(
 /// https://www.w3.org/TR/WGSL/#builtin-values-position
 /// Thus each half-open scaled edge maps to ceil(edge * zoom - 0.5). Resolving
 /// opaque overlaps in logical pixels before this mapping preserves coverage.
-fn push_surface_rect(
+pub(crate) fn push_surface_rect(
     instances: &mut Vec<SpriteInstance>,
     [left, top, width, height]: [i32; 4],
     tint: [f32; 3],
@@ -745,7 +752,8 @@ mod tests {
         let rules = rules_with_factory_and_non_factory();
 
         assert!(
-            build_target_line_instances(&state, Some(&sim), None, None, test_viewport()).is_empty()
+            build_target_line_instances(&state, false, Some(&sim), None, None, test_viewport())
+                .is_empty()
         );
         assert!(
             !build_factory_rally_line_instances(
@@ -766,6 +774,7 @@ mod tests {
         assert!(
             build_target_line_instances(
                 &TargetLineState::default(),
+                false,
                 None,
                 None,
                 None,

@@ -395,6 +395,10 @@ impl Default for CountryDifficultyBiases {
 /// Global gameplay constants from `[General]` that affect vision, gap generators, etc.
 #[derive(Debug, Clone)]
 pub struct GeneralRules {
+    /// `[General] MaxWaypointPathLength`, Rules+90. Constructor665725
+    /// writes15; ReadGeneral671DB2..671DCC passes the prior signed value to
+    /// ReadInteger5276D0 and stores it unchanged, without a clamp.
+    pub max_waypoint_path_length: i32,
     /// `[AudioVisual]` thresholds copied to the presentation frame-rate
     /// controller by Fill_In_Data6850F5 and the radar movie transitions.
     pub detail: DetailRules,
@@ -1137,13 +1141,25 @@ pub struct GeneralRules {
     /// then Voc FindIndex7514D0, retaining the prior ID on missing, empty or
     /// unresolved text. The fixed SOUNDMD binder owns name resolution.
     pub guard_sound: Option<String>,
+    /// Rules+1D4: constructor6658F2=-1; AudioVisual6696C0..6696FF reads
+    /// StartPlanningModeSound with ReadString128 and Voc Find7514D0,
+    /// retaining the prior ID on a missing or invalid name.
+    pub start_planning_mode_sound: Option<String>,
+    /// Rules+1E0: constructor665904=-1; AudioVisual66970A..669740 reads
+    /// EndPlanningModeSound immediately after Start, with the same reader.
+    pub end_planning_mode_sound: Option<String>,
+    /// Rules+1D8: constructor6658F8=-1; AudioVisual669B25..669B52 reads
+    /// AddPlanningModeCommandSound later in the same pass, retaining the ID.
+    pub add_planning_mode_command_sound: Option<String>,
     /// ScatterSelectedObjects730FE0's centered cue. Rules+728 starts at -1
     /// (66585F/666063); AudioVisual66AE6C..66AEA2 reads exact ScatterSound
     /// with ReadString128 and fixed Voc lookup, retaining failed selections.
     pub scatter_sound: Option<String>,
     /// `[AudioVisual] ScoldSound=` (`Rules+0x700`, read at `0x0066ABE8`
     /// through `VocClass::FindByName`; retail `MenuScold`): ToggleRepair's
-    /// sound when a repair is switched on at full Strength (`0x00447068`).
+    /// sound when a repair is switched on at full Strength (`0x00447068`),
+    /// and PlanningMode refusal63A0D0. Constructor666027 stores -1;
+    ///66ABD3..66AC12 retains the prior resolved ID on failed/empty reads.
     pub scold_sound: Option<String>,
     /// Launcher Options Sound/Voice preview cue from [AudioVisual] GenericBeep.
     pub generic_beep_sound: Option<String>,
@@ -2058,6 +2074,7 @@ impl PrismSupportRules {
 impl Default for GeneralRules {
     fn default() -> Self {
         Self {
+            max_waypoint_path_length: 15,
             detail: DetailRules::default(),
             pose_dir: 0,
             deploy_dir: 0,
@@ -2256,6 +2273,9 @@ impl Default for GeneralRules {
             gui_move_out_sound: None,
             generic_click_sound: None,
             guard_sound: None,
+            start_planning_mode_sound: None,
+            end_planning_mode_sound: None,
+            add_planning_mode_command_sound: None,
             scatter_sound: None,
             scold_sound: None,
             generic_beep_sound: None,
@@ -2916,6 +2936,8 @@ impl GeneralRules {
             detail,
             pose_dir,
             deploy_dir,
+            max_waypoint_path_length: general
+                .read_int("MaxWaypointPathLength", defaults.max_waypoint_path_length),
             scroll_multiplier: audio_visual
                 .read_double("ScrollMultiplier", defaults.scroll_multiplier),
             savour_delay_minutes,
@@ -3285,10 +3307,11 @@ impl GeneralRules {
                 .map(str::to_owned),
             // Native constructor -1; resolved by the fixed SOUNDMD binder.
             guard_sound: None,
+            start_planning_mode_sound: None,
+            end_planning_mode_sound: None,
+            add_planning_mode_command_sound: None,
             scatter_sound: None,
-            scold_sound: audio_visual
-                .read_name("ScoldSound", 0x80)
-                .map(str::to_owned),
+            scold_sound: None,
             generic_beep_sound: audio_visual
                 .read_name("GenericBeep", 0x80)
                 .map(str::to_owned),
@@ -4053,6 +4076,18 @@ impl RuleSet {
         self.general.guard_sound = ini
             .section("AudioVisual")
             .and_then(|section| sounds.read_rules_reference(section, "GuardSound"));
+        // Original ReadAudioVisual order: Start6696C0, End66970A, Add669B25.
+        // The processed section owns pass history; the fixed catalog owns IDs.
+        self.general.start_planning_mode_sound = ini
+            .section("AudioVisual")
+            .and_then(|section| sounds.read_rules_reference(section, "StartPlanningModeSound"));
+        self.general.end_planning_mode_sound = ini
+            .section("AudioVisual")
+            .and_then(|section| sounds.read_rules_reference(section, "EndPlanningModeSound"));
+        self.general.add_planning_mode_command_sound =
+            ini.section("AudioVisual").and_then(|section| {
+                sounds.read_rules_reference(section, "AddPlanningModeCommandSound")
+            });
         self.general.time_warp_out_sound = ini
             .section("AudioVisual")
             .and_then(|section| sounds.read_rules_reference(section, "LetsDoTheTimeWarpOutAgain"));
@@ -4065,6 +4100,9 @@ impl RuleSet {
         self.general.scatter_sound = ini
             .section("AudioVisual")
             .and_then(|section| sounds.read_rules_reference(section, "ScatterSound"));
+        self.general.scold_sound = ini
+            .section("AudioVisual")
+            .and_then(|section| sounds.read_rules_reference(section, "ScoldSound"));
         for object in &mut self.object_list {
             let section = ini.section(&object.id);
             object.bind_damage_sound_reference(section, sounds);
@@ -6658,7 +6696,8 @@ SpawnCount=3
         assert_eq!(general.maximum_queued_objects, 29);
         assert_eq!(general.gui_build_sound.as_deref(), Some("MenuClick"));
         assert_eq!(general.building_slam.as_deref(), Some("PlaceBuilding"));
-        assert_eq!(general.scold_sound.as_deref(), Some("MenuScold"));
+        let Some(retail) = crate::rules::retail_ini_fixture::retail_battle_rules() else { return; };
+        assert_eq!(retail.rules.general.scold_sound.as_deref(), Some("MenuScold"));
     }
 
     /// RulesClass constructor @ 0x00667588 stores 0x280 leptons; ReadGeneral

@@ -583,6 +583,13 @@ pub(crate) enum ConcealOutcome {
 /// but the stream preserves the verified native relative ordering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LifecycleOutput {
+    /// NodeDelete6380A6 captures its FIRST member successor before removal;
+    ///6380EE updates only the local house retained presentation highlight.
+    PlanningNodeDeleted {
+        owner: InternedId,
+        node_id: u64,
+        next_node: Option<u64>,
+    },
     /// Local HouseBegin4FA6AA→Sidebar6A6140 links the reached cameo to this
     /// live Factory. Product expiry and a later rearm do not erase the link.
     ProductionFactoryLinked {
@@ -5101,6 +5108,7 @@ impl Simulation {
     }
 
     pub(crate) fn uninit_with_context(&mut self, stable_id: u64, context: UninitContext<'_>) {
+        self.planning_detach_actor(stable_id);
         if self
             .smudge_grid
             .as_ref()

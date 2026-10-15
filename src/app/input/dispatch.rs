@@ -236,7 +236,8 @@ pub(crate) fn tactical_mouse(state: &mut AppState, button: MouseButton, btn_stat
                 if !state.match_state.input.tactical_mouse.begin_left_press() {
                     return;
                 }
-                if state.match_state.input.targeting_mode.is_some()
+                if state.match_state.input.planning.active()
+                    || state.match_state.input.targeting_mode.is_some()
                     || state
                         .match_state
                         .match_presentation
@@ -275,6 +276,9 @@ pub(crate) fn tactical_mouse(state: &mut AppState, button: MouseButton, btn_stat
                 }
                 if let Some(type_id) = state.armed_building_type().map(str::to_owned) {
                     place_ready_building_at_cursor(state, &type_id);
+                    return;
+                }
+                if crate::app::input::planning_mode::connect_at_cursor(state) {
                     return;
                 }
                 // Only an active band box owns a clamped tactical endpoint.
@@ -1700,64 +1704,8 @@ fn dispatch_retail_hotkey(state: &mut AppState, command: HotkeyCommand) {
         HotkeyCommand::Options => handle_options_hotkey(state),
         HotkeyCommand::CenterView => crate::app::input::camera::center_view_on_selection(state),
         HotkeyCommand::Follow => crate::app::input::camera::toggle_follow_target(state),
-        // DEFERRED, not overlooked: waypoint planning mode is a whole input
-        // mode, and VERA has none of it. Prior research already handed this off:
-        // docs/research/DRIVE_QUEUED_CLICK_EVENT_PLANNING_MODE_OUTCOME_RESWARM_20260528.md,
-        // whose conclusion — implement it as a separate path-command surface,
-        // NOT as FootClass NavQueue entries — still stands.
-        //
-        // Mode edge. `PlanningModeCommandClass::Execute` 0x00536750 reads the
-        // key-up bit itself (`TEST AH,0x8`), so the mode is HELD, not toggled.
-        // It is not alone in that: `TypeSelectCommandClass::Execute` 0x005368B0
-        // has the identical prologue, and VERA already models that one as a
-        // both-edges held command in `handle_type_select_key_edge`. Press routes
-        // 0x00731A50 -> 0x006379C0, which sets the mode byte `DAT_00AC4CF4`,
-        // plays a sound and posts UI message 0x11C7. Release routes 0x00731A70
-        // -> 0x00637A10, which clears the mode byte and posts 0x11C8. That same
-        // mode byte is what `FUN_0063AB60` hands
-        // `ScrollClass__UpdateMouseScrolling` 0x00692F30 ahead of its capture
-        // routing.
-        //
-        // Command surface — THREE event types, not one, and the plan is streamed
-        // as it is drawn rather than shipped at the end:
-        //   * PLANCONNECT 0x2A — emitted by `FUN_0063AD50` once PER SELECTED
-        //     OBJECT PER CLICK, through the payload ctor 0x004C6780 and
-        //     `Try_Append_Event_To_OutList`.
-        //   * PLANCOMMIT 0x2B — the release event. Built with the 2-arg
-        //     `EventClass(house, type)` ctor 0x004C66C0, so it carries only the
-        //     type, the local house `g_PlayerPtr+0x30` and the frame. It carries
-        //     NO path data.
-        //   * PLANNODEDELETE 0x2C — `DeleteCommandClass::Execute` 0x00537F90 ->
-        //     0x00731A10 -> `FUN_00637D00`, i.e. the Delete key edits the plan
-        //     before it commits. `HotkeyCommand::Delete` below belongs to this
-        //     same deferred mode.
-        // All three land in one executor, `FUN_00637E00`. Module string
-        // `D:\ra2mdpost\PlanMgr.cpp` at 0x00836BD4.
-        //
-        // Storage is the row's named model: TWELVE `WaypointPathClass*` slots on
-        // HouseClass at +0x210..+0x23C with the active slot index at +0x20C
-        // (walked by `FUN_006DAD60`), the point count at path+0x38, and a
-        // per-object back-pointer at `TechnoClass+0x514`. Paths can loop
-        // (`WaypointPathClass+0x24`). The overlay is a dashed all-segment line
-        // with a per-point shroud test and MOUSE.SHA action 0x3C.
-        //
-        // INI: `MaxWaypointPathLength=15` caps the path (Rules+0x90), and
-        // `AddPlanningModeCommandSound=PlanningModeAdd` is a third sound, played
-        // per added node — start and end are not the whole set.
-        //
-        // Trigger: holding Z. Player effect: the key does nothing, so no
-        // multi-leg route can be planned. Frequency: occasional — a deliberate
-        // habit rather than a reflex. Downstream risk: bounded but wider than a
-        // single command — three new event types on the deterministic stream
-        // (row 89 owns the envelope), house-side path storage, and a new overlay
-        // layer. Nothing here needs rework to accommodate it later.
-        //
-        // Note the honest limit of the frequency call: VERA's Shift-queue is NOT
-        // an equivalent, and is itself VERA-internal with the gamemd equivalent
-        // UNIMPLEMENTED. It reproduces single-unit route geometry only. It
-        // cannot commit every selected unit's path at one instant, cannot edit
-        // nodes before committing, and cannot loop a path.
-        HotkeyCommand::PlanningMode => {}
+        HotkeyCommand::PlanningMode => crate::app::input::planning_mode::toggle(state),
+        HotkeyCommand::Delete => crate::app::input::planning_mode::delete_at_cursor(state),
         HotkeyCommand::ScatterObject => queue_scatter_for_selected(state),
         HotkeyCommand::VeterancyNav => selection_navigation::execute_category_navigation(
             state,
@@ -1779,7 +1727,6 @@ fn dispatch_retail_hotkey(state: &mut AppState, command: HotkeyCommand) {
         | HotkeyCommand::PlaceBeacon
         | HotkeyCommand::AllToCheer
         | HotkeyCommand::PageUser
-        | HotkeyCommand::Delete
         | HotkeyCommand::Taunt(_) => {}
     }
 }
@@ -1814,7 +1761,10 @@ pub(crate) fn dispatch_command_bar(state: &mut AppState, command: usize, right: 
         6 => HotkeyCommand::GuardObject,
         7 => HotkeyCommand::PlaceBeacon,
         8 => HotkeyCommand::StopObject,
-        9 => HotkeyCommand::PlanningMode,
+        9 => {
+            crate::app::input::planning_mode::toggle(state);
+            return;
+        }
         10 => HotkeyCommand::AllToCheer,
         _ => return,
     };
@@ -2572,8 +2522,8 @@ fn queue_selection_snapshot_command(state: &mut AppState, selected_ids: Vec<u64>
 /// `0x00730ECD..0x00730EE3`), so an offline Robot Tank a click selected stays
 /// put.
 ///
-/// RESIDUAL: a refused event push ending the walk (`0x00730EF5`) and the
-/// closing `Rules+0x720` sound are not ported.
+/// Planning refusal at730EF5 ->6FFE00 ->639FD0 ends this walk before
+/// scheduling ordinary Stop. The closing Rules+720 sound is a residual.
 fn queue_stop_for_selected(state: &mut AppState) {
     let sim = state
         .match_state
@@ -2594,6 +2544,13 @@ fn queue_stop_for_selected(state: &mut AppState) {
     if selected_ids.is_empty() {
         return;
     }
+    if state.match_state.input.planning.active() {
+        crate::app::input::planning_mode::refuse(
+            state,
+            crate::app::input::planning_mode::PlanningRefusal::Stop,
+        );
+        return;
+    }
     let owner: String = preferred_local_owner(state).unwrap_or_else(|| "Americans".to_string());
     for entity_id in selected_ids {
         schedule_command(state, &owner, Command::Stop { entity_id });
@@ -2604,6 +2561,13 @@ fn queue_stop_for_selected(state: &mut AppState) {
 /// The input ledger already contains pending selection order; never sort it
 /// or require that the selected bits have reached the simulation yet.
 fn queue_guard_for_selected(state: &mut AppState) {
+    if state.match_state.input.planning.active() {
+        crate::app::input::planning_mode::refuse(
+            state,
+            crate::app::input::planning_mode::PlanningRefusal::Guard,
+        );
+        return;
+    }
     let selected = selected_stable_ids_in_order(
         state
             .match_state
@@ -2640,6 +2604,30 @@ fn queue_scatter_for_selected(state: &mut AppState) {
         &state.match_state.input.selection_order,
         state.match_state.input.selection_order_pending,
     );
+    //730FE0 only reaches6FFE00 for a controllable Techno. Use the
+    // existing Scatter producer admission; an empty/refused selection
+    // produces neither a HUD row nor an ordinary event.
+    if state.match_state.input.planning.active() {
+        let eligible = state
+            .match_state
+            .sim_runtime
+            .as_ref()
+            .is_some_and(|runtime| {
+                selected.iter().any(|&id| {
+                    runtime
+                        .simulation
+                        .scatter_key_command(id, &runtime.resources.rules)
+                        .is_some()
+                })
+            });
+        if eligible {
+            crate::app::input::planning_mode::refuse(
+                state,
+                crate::app::input::planning_mode::PlanningRefusal::Scatter,
+            );
+        }
+        return;
+    }
     let Some(runtime) = state.match_state.sim_runtime.as_mut() else {
         return;
     };
@@ -2673,7 +2661,7 @@ fn queue_scatter_orders(
     }
     // 731032..73104A: one PlayAtPos750920, gain1, center2000, arg0.
     // A nonempty selection that admits no actor still produces this cue.
-    // PlanningMode637AA0/639FD0 remains its separate unimplemented route.
+    // PlanningMode637AA0/639FD0 refusal is admitted by handle_scatter_key.
     // The existing offline ingress bypasses bounded native OutList admission;
     // its saturation and network-pump integration remain outside this path.
     rules
@@ -2691,7 +2679,7 @@ fn queue_scatter_orders(
 /// actor's eligibility/current Cell and the shared MegaMission codec. This
 /// caller preserves list order, leaves the voice latch enabled for every
 /// actor, and emits GuardSound even if a nonempty selection was all skipped.
-/// Planning-mode637AA0/63A0D0 remains its separate unimplemented input route.
+/// Planning-mode637AA0/63A0D0 is handled before this ordinary producer.
 fn queue_area_guard_orders(
     sim: &mut crate::sim::world::Simulation,
     rules: &crate::rules::ruleset::RuleSet,

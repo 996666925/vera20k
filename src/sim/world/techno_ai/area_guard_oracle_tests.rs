@@ -354,6 +354,9 @@ fn delivered_command(f: &SuppliedFootFixture, row: &Value, boundary: &Value) -> 
             entity_id: id(record.source_id),
             target_id: id(native_id),
         },
+        MegaMissionOrder::Attack { .. } | MegaMissionOrder::AttackMove { .. } => {
+            panic!("AreaGuard corpus unexpectedly contains an attack event")
+        }
     }
 }
 

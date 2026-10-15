@@ -35,11 +35,13 @@ pub(crate) fn led_target_coordinate(
     let target_id = match tarcom {
         None => return ProjectileCoord::new(0, 0, 0),
         Some(TargetKind::Cell(rx, ry)) => {
-            return crate::sim::projectile::cell_target_coord(
+            let coord = ground_pose::target_get_target_coords(
+                TargetKind::Cell(rx, ry),
+                &world.substrate.entities,
                 world.resolved_terrain.as_ref(),
-                rx,
-                ry,
-            );
+            )
+            .expect("Cell target coordinates are defined");
+            return ProjectileCoord::new(coord.x, coord.y, coord.z);
         }
         Some(TargetKind::Entity(target_id)) => target_id,
     };
@@ -48,7 +50,12 @@ pub(crate) fn led_target_coordinate(
     });
     // Object410540's virtual+58 forwards virtual+48: the foundation centre
     // for Building447AC0, the live Object5F65A0 coordinate for other Techno.
-    let target_coords = ground_pose::object_get_coords(target, world.resolved_terrain.as_ref());
+    let target_coords = ground_pose::target_get_target_coords(
+        TargetKind::Entity(target_id),
+        &world.substrate.entities,
+        world.resolved_terrain.as_ref(),
+    )
+    .expect("retained TarCom resolved above");
     let target_coord = ProjectileCoord::new(target_coords.x, target_coords.y, target_coords.z);
     if target.category() != EntityCategory::Unit || motion_query::is_moving(target) != Some(true) {
         return target_coord;

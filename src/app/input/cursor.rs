@@ -187,6 +187,10 @@ pub(crate) fn current_cursor_feedback_kind(state: &AppState) -> Option<CursorFee
     if selected.is_empty() {
         return None;
     }
+    // PlanMgr63AC41 selects native action0 over a planning node.
+    if crate::app::input::planning_mode::node_at_cursor(state).is_some() {
+        return Some(CursorFeedbackKind::Default);
+    }
     let owner = preferred_local_owner_name(state).unwrap_or_else(|| "Americans".to_string());
     let (world_x, world_y) = crate::app::match_runtime::sim_tick::screen_point_to_world(
         state,

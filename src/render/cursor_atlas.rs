@@ -100,9 +100,22 @@ pub(crate) enum CursorId {
 /// All loaded cursor animation sequences from mouse.sha, keyed by CursorId.
 pub(crate) struct SoftwareCursor {
     pub(crate) sequences: HashMap<CursorId, SoftwareCursorSequence>,
+    /// PlanNode63D630 reuses the loaded mouse shape, rows76/77, through the
+    /// same mouse palette. CPU logical pixels preserve its interleaving with
+    /// line/rectangle stores without adding a second asset loader or atlas.
+    planning_badges: [Option<PlanningBadge>; 2],
+}
+
+pub(crate) struct PlanningBadge {
+    pub(crate) width: i32,
+    pub(crate) height: i32,
+    pub(crate) rgba: Vec<u8>,
 }
 
 impl SoftwareCursor {
+    pub(crate) fn planning_badge(&self, frame: usize) -> Option<&PlanningBadge> {
+        self.planning_badges.get(frame.checked_sub(433)?)?.as_ref()
+    }
     /// Look up a cursor sequence by id, falling back to Default if not found.
     pub(crate) fn get(&self, id: CursorId) -> Option<&SoftwareCursorSequence> {
         self.sequences
@@ -173,7 +186,8 @@ const ANIM_INTERVAL_MS: u64 = ANIM_RATE_UNITS * CURSOR_TIMER_UNIT_MS;
 /// Format: (CursorId, start_frame, frame_count, interval_ms, hotspot).
 const CURSOR_DEFS: &[(CursorId, usize, usize, u64, CursorHotspot)] = &[
     // --- Core gameplay cursors ---
-    (CursorId::Default, 0, 1, 0, CursorHotspot::TopLeft),
+    // Native82D028 row0: normal frame0 and static small variant frame1.
+    (CursorId::Default, 0, 2, 0, CursorHotspot::TopLeft),
     (
         CursorId::Select,
         18,
@@ -509,8 +523,7 @@ pub(crate) fn build_software_cursor(
 
     maybe_export_mouse_sheet(&shp, &palette);
 
-    let mut sequences: HashMap<CursorId, SoftwareCursorSequence> =
-        HashMap::new();
+    let mut sequences: HashMap<CursorId, SoftwareCursorSequence> = HashMap::new();
     for &(id, start, count, interval_ms, hotspot) in CURSOR_DEFS {
         if let Some(seq) = build_cursor_sequence(
             gpu,
@@ -529,7 +542,17 @@ pub(crate) fn build_software_cursor(
         }
         // Non-default cursors that fail silently skip; SoftwareCursor::get() falls back to Default.
     }
-    Some(SoftwareCursor { sequences })
+    let planning_badges = [433, 434].map(|frame| {
+        Some(PlanningBadge {
+            width: i32::from(shp.width),
+            height: i32::from(shp.height),
+            rgba: frame_to_canvas_rgba(&shp, frame, &palette).ok()?,
+        })
+    });
+    Some(SoftwareCursor {
+        sequences,
+        planning_badges,
+    })
 }
 
 fn build_cursor_sequence(

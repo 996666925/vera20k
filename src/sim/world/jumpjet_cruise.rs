@@ -267,7 +267,12 @@ impl JumpjetFlightHost for CruiseHost<'_> {
             .foot_speed
             .set_speed_fraction_native_bits(fraction_bits);
     }
-    fn arrival_notify(&mut self) {}
+    fn arrival_notify(&mut self) {
+        // Jumpjet arrival705D60 ->6385C0, at the state transition sites
+        //54BE2F/54BE97/54BEDB and54C28C/54C2D2/54C2F0. The path owner
+        //queues Wait before publishing the next event; it does not land here.
+        self.sim.planning_start_actor(self.stable_id);
+    }
     /// `FacingClass::UpdateFacing @ 0x004C9300` on the body facing (`+0x388`).
     fn snap_body_facing(&mut self, facing: u16) {
         self.sim

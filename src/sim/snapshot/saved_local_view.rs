@@ -37,6 +37,8 @@ pub(crate) struct SavedLocalView {
 pub(crate) struct SavedCursorModes {
     pub(crate) repair: bool,
     pub(crate) sell: bool,
+    /// Local PlanMgr input mode; physical-key ownership is never saved.
+    pub(crate) planning: bool,
     pub(crate) targeting: Option<SavedTargeting>,
 }
 

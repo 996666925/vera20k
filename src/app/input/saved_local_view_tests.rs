@@ -193,24 +193,24 @@ fn malformed_local_view_is_rejected_before_the_outgoing_input_changes() {
         ),
         (
             "modes",
-            serde_json::json!({"repair": false, "sell": false,
+            serde_json::json!({"repair": false, "sell": false, "planning": false,
                 "targeting": {"SuperWeapon": "MissingSuper"}}),
         ),
         (
             "modes",
-            serde_json::json!({"repair": false, "sell": false,
+            serde_json::json!({"repair": false, "sell": false, "planning": false,
                 "targeting": {"BuildingPlacement":
                     {"type_id": "UNIT", "product_id": 99, "owner": "local"}}}),
         ),
         (
             "modes",
-            serde_json::json!({"repair": false, "sell": false,
+            serde_json::json!({"repair": false, "sell": false, "planning": false,
                 "targeting": {"BuildingPlacement":
                     {"type_id": "MissingType", "product_id": 1, "owner": "local"}}}),
         ),
         (
             "modes",
-            serde_json::json!({"repair": false, "sell": false,
+            serde_json::json!({"repair": false, "sell": false, "planning": false,
                 "targeting": {"BuildingPlacement":
                     {"type_id": "UNIT", "product_id": 1, "owner": "nobody"}}}),
         ),
