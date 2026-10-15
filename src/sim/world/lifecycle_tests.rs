@@ -5701,9 +5701,9 @@ fn substrate_registration_and_removal_dispatch_is_order_identical() {
 
     // The retire subset dispatches through the same classifier: Terrain /
     // Bullet / Wave retire; Entity and Anim do not.
-    assert!(!sim.retire_non_entity_object(entity_id));
-    assert!(!sim.retire_non_entity_object(anim_id));
-    assert!(sim.retire_non_entity_object(terrain_id));
+    assert!(!sim.retire_non_entity_object(entity_id, crate::sim::world::UninitContext::default()));
+    assert!(!sim.retire_non_entity_object(anim_id, crate::sim::world::UninitContext::default()));
+    assert!(sim.retire_non_entity_object(terrain_id, crate::sim::world::UninitContext::default()));
     assert!(sim.substrate.pending_delete.contains_object(&terrain_id));
     assert!(!sim.live_object_order_snapshot().contains(&terrain_id));
 

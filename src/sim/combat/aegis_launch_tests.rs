@@ -1,6 +1,7 @@
-//! Retail Aegis shots through the production FireAt owner. These fixtures
-//! begin after admission: the release map captures cover the command,
-//! aircraft-target admission and scheduler. Native launch-vector comparisons
+//! Retail Aegis shots through the production FireAt owner. Launch fixtures
+//! begin after admission; scalable enrollment also exercises UnitTarget's
+//! actual admission. Release captures cover commands and the scheduler.
+//! Native launch-vector comparisons
 //! live in projectile::launch's radial_launch.json consumer.
 
 use super::{CombatEmit, TargetKind, build_attacker_snapshot, combat_weapon, world_fire};
@@ -287,6 +288,15 @@ fn mid_fan_snapshot_retains_counter_hash_and_continued_shots() {
             "BulletLoad changes only the represented timer for bullet {id}"
         );
     }
+    // LoadContent67E739 clears the old scalable vector; BulletLoad46AE70
+    // does not reenroll. Raw BulletType+2E8 survives its46C6A0 load.
+    assert!(restored.world.projectiles.scalable_members().is_empty());
+    let kind = scene.world.interner.get("MedusaProjectile").unwrap();
+    assert_eq!(
+        scene.world.projectiles.scaled_spawn_delay(kind),
+        restored.world.projectiles.scaled_spawn_delay(kind)
+    );
+    scene.world.projectiles.restore_scalable_after_load();
     assert_eq!(scene.world.state_hash(), restored.world.state_hash());
     let hash = restored.world.state_hash();
     let saved_burst = restored
@@ -358,4 +368,72 @@ fn retail_scalable_projectiles_have_no_trailer_and_medusa_keeps_its_line_trail()
     assert_eq!(medusa.arm, 1);
     assert_eq!(fixture.rules.weapon("Medusa").unwrap().burst, 1);
     assert_eq!(fixture.rules.weapon("MedusaE").unwrap().burst, 2);
+}
+
+/// The actual Unit FireAt wrapper enrolls both normal and elite Medusa
+/// returns, despite their null Trailer. Elite Burst2 still counts each shot.
+#[test]
+fn retail_normal_and_elite_aegis_unit_fire_enrolls_each_returned_bullet() {
+    for elite in [false, true] {
+        let Some(mut scene) = AegisScene::new(elite) else {
+            return;
+        };
+        assert!(
+            scene
+                .rules
+                .weapon(if elite { "MedusaE" } else { "Medusa" })
+                .unwrap()
+                .omni_fire
+        );
+        let owner = scene
+            .world
+            .substrate
+            .entities
+            .get(scene.aegis)
+            .unwrap()
+            .owner();
+        let victim = &scene
+            .world
+            .substrate
+            .entities
+            .get(scene.target)
+            .unwrap()
+            .position;
+        scene
+            .world
+            .fog
+            .mark_visible_for_owner(owner, victim.rx(), victim.ry());
+        for index in 0..8 {
+            let before = scene.world.projectiles.len();
+            let visit = if index == 0 {
+                world_fire::FireVisit::UnitTarget(scene.aegis)
+            } else {
+                world_fire::FireVisit::Direct {
+                    id: scene.aegis,
+                    target: TargetKind::Entity(scene.target),
+                    weapon_index: 0,
+                }
+            };
+            scene
+                .world
+                .commit_fire_visit(visit, &scene.rules, None, FrameEffects::default());
+            assert_eq!(scene.world.projectiles.len(), before + 1);
+        }
+        let ids: Vec<_> = scene.world.projectiles.iter().map(|(&id, _)| id).collect();
+        assert_eq!(scene.world.projectiles.scalable_members(), ids);
+        let type_id = scene.world.interner.get("MedusaProjectile").unwrap();
+        let kind = scene.rules.projectile("MedusaProjectile").unwrap();
+        assert!(kind.scalable);
+        assert_eq!(kind.trailer, None);
+        assert_eq!(scene.world.projectiles.scaled_spawn_delay(type_id), 3);
+        // No Trailer means no cadence IDIV or Anim allocation at the header;
+        // the separate retained line trail remains the existing visual owner.
+        let bullet = ids[0];
+        let head = scene
+            .world
+            .projectiles
+            .begin_ai_visit(bullet, |_| false)
+            .unwrap();
+        assert!(scene.world.projectiles.trailer(&head, kind, 3).is_none());
+    }
 }

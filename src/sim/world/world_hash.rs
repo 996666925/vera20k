@@ -915,6 +915,7 @@ impl Simulation {
     }
 
     fn hash_projectiles(&self, hasher: &mut impl Hasher) {
+        self.projectiles.hash_scalable_runtime(hasher);
         self.projectiles.len().hash(hasher);
         for (&id, projectile) in self.projectiles.iter() {
             id.hash(hasher);

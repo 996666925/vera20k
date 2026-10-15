@@ -203,7 +203,7 @@ fn action_99_takes_the_cell_terrain_without_a_building_and_its_uninit_detaches()
 
     // The tree's UnInit Limbo detaches its handle.
     sim.sound_events.clear();
-    assert!(sim.retire_non_entity_object(41));
+    assert!(sim.retire_non_entity_object(41, crate::sim::world::UninitContext::default()));
     assert!(matches!(
         sim.sound_events.as_slice(),
         [SimSoundEvent::ObjectSoundDetached { owner }] if *owner == custom_sound_owner(41)

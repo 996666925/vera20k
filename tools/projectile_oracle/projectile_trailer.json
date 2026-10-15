@@ -12268,6 +12268,3860 @@
       "waiting_after": false
     }
   ],
+  "scalable_controls": {
+    "authored_art": {
+      "BBBLELRG": {
+        "Flat": "yes",
+        "Layer": "surface",
+        "Rate": "450"
+      },
+      "SUBT": {
+        "Flat": "yes",
+        "SpawnDelay": "7",
+        "Trailer": "BBBLELRG",
+        "Voxel": "yes"
+      }
+    },
+    "authored_reader_admitted": [
+      true,
+      true
+    ],
+    "authored_rules": [
+      {
+        "Torpedo": {
+          "Image": "SUBT",
+          "Scalable": "yes"
+        }
+      },
+      {
+        "ScalableTrailerB": {
+          "Image": "SUBT",
+          "Scalable": "yes"
+        }
+      }
+    ],
+    "medusa_layers": [
+      {
+        "admitted": true,
+        "file": "RULESMD.INI",
+        "physical_keys": {
+          "MedusaProjectile": {
+            "AA": "yes",
+            "AG": "no",
+            "Arm": "1",
+            "CourseLockDuration": "15",
+            "High": "yes",
+            "Image": "MEDUSA",
+            "ROT": "20",
+            "Scalable": "yes",
+            "Shadow": "no",
+            "SubjectToCliffs": "no",
+            "SubjectToElevation": "no",
+            "SubjectToWalls": "no"
+          }
+        }
+      },
+      {
+        "admitted": false,
+        "file": "MPBattleMD.ini",
+        "physical_keys": {}
+      },
+      {
+        "admitted": false,
+        "file": "Hills.map",
+        "physical_keys": {}
+      }
+    ],
+    "overflow_controls": [
+      {
+        "art_spawn_delay": "2147483647",
+        "authored_rules": {
+          "Torpedo": {
+            "Image": "SUBT",
+            "Scalable": "yes"
+          }
+        },
+        "reader_admitted": true,
+        "states": [
+          {
+            "count": 1,
+            "members": [
+              1
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": 2147483647,
+                "scalable": true,
+                "scaled_delay": 2147483647,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 2,
+            "members": [
+              1,
+              2
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": 2147483647,
+                "scalable": true,
+                "scaled_delay": 2147483647,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 3,
+            "members": [
+              1,
+              2,
+              3
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": 2147483647,
+                "scalable": true,
+                "scaled_delay": 2147483647,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 4,
+            "members": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": 2147483647,
+                "scalable": true,
+                "scaled_delay": 2147483647,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 5,
+            "members": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": 2147483647,
+                "scalable": true,
+                "scaled_delay": 2147483647,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 6,
+            "members": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": 2147483647,
+                "scalable": true,
+                "scaled_delay": 2147483647,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 7,
+            "members": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": 2147483647,
+                "scalable": true,
+                "scaled_delay": 2147483647,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 8,
+            "members": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": 2147483647,
+                "scalable": true,
+                "scaled_delay": -2147483648,
+                "trailer": "BBBLELRG"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "art_spawn_delay": "-2147483648",
+        "authored_rules": {
+          "Torpedo": {
+            "Image": "SUBT",
+            "Scalable": "yes"
+          }
+        },
+        "reader_admitted": true,
+        "states": [
+          {
+            "count": 1,
+            "members": [
+              1
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": -2147483648,
+                "scalable": true,
+                "scaled_delay": -2147483648,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 2,
+            "members": [
+              1,
+              2
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": -2147483648,
+                "scalable": true,
+                "scaled_delay": -2147483648,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 3,
+            "members": [
+              1,
+              2,
+              3
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": -2147483648,
+                "scalable": true,
+                "scaled_delay": -2147483648,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 4,
+            "members": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": -2147483648,
+                "scalable": true,
+                "scaled_delay": -2147483648,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 5,
+            "members": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": -2147483648,
+                "scalable": true,
+                "scaled_delay": -2147483648,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 6,
+            "members": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": -2147483648,
+                "scalable": true,
+                "scaled_delay": -2147483648,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 7,
+            "members": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": -2147483648,
+                "scalable": true,
+                "scaled_delay": -2147483648,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          {
+            "count": 8,
+            "members": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": -2147483648,
+                "scalable": true,
+                "scaled_delay": -2147483647,
+                "trailer": "BBBLELRG"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "rows": [
+      {
+        "action": "enroll",
+        "after": {
+          "count": 1,
+          "members": [
+            1
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 10,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 0,
+          "members": [],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 10,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 1,
+        "bullet_type": "Torpedo",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 0,
+          "bullets": 1,
+          "pending": 0
+        },
+        "name": "count_1",
+        "transport": []
+      },
+      {
+        "action": "enroll",
+        "after": {
+          "count": 2,
+          "members": [
+            1,
+            2
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 11,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 1,
+          "members": [
+            1
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 11,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 2,
+        "bullet_type": "Torpedo",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 0,
+          "bullets": 2,
+          "pending": 0
+        },
+        "name": "count_2",
+        "transport": []
+      },
+      {
+        "action": "enroll",
+        "after": {
+          "count": 3,
+          "members": [
+            1,
+            2,
+            3
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 12,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 2,
+          "members": [
+            1,
+            2
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 12,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 3,
+        "bullet_type": "Torpedo",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 0,
+          "bullets": 3,
+          "pending": 0
+        },
+        "name": "count_3",
+        "transport": []
+      },
+      {
+        "action": "enroll",
+        "after": {
+          "count": 4,
+          "members": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 13,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 3,
+          "members": [
+            1,
+            2,
+            3
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 13,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 4,
+        "bullet_type": "Torpedo",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 0,
+          "bullets": 4,
+          "pending": 0
+        },
+        "name": "count_4",
+        "transport": []
+      },
+      {
+        "action": "enroll",
+        "after": {
+          "count": 5,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 14,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 4,
+          "members": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 14,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 5,
+        "bullet_type": "Torpedo",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 0,
+          "bullets": 5,
+          "pending": 0
+        },
+        "name": "count_5",
+        "transport": []
+      },
+      {
+        "action": "enroll",
+        "after": {
+          "count": 6,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 15,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 5,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 15,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 6,
+        "bullet_type": "Torpedo",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 0,
+          "bullets": 6,
+          "pending": 0
+        },
+        "name": "count_6",
+        "transport": []
+      },
+      {
+        "action": "enroll",
+        "after": {
+          "count": 7,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 16,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 6,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 16,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 7,
+        "bullet_type": "Torpedo",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 0,
+          "bullets": 7,
+          "pending": 0
+        },
+        "name": "count_7",
+        "transport": []
+      },
+      {
+        "action": "header",
+        "after": {
+          "count": 7,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before": {
+          "count": 7,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "bullet": 7,
+        "header": {
+          "after_native_id": 17,
+          "after_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "before_native_id": 16,
+          "before_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "bullet_native_id": 16,
+          "calls": [
+            {
+              "args": [
+                604207136,
+                268959348,
+                1,
+                1,
+                1536,
+                0,
+                0
+              ],
+              "caller": "0x4668bd",
+              "cleanup": 28,
+              "ecx": "0x2403ab60",
+              "emission_index": 0,
+              "entry": "0x421ea0",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x1007fe30",
+              "frame": 3,
+              "name": "AnimCtor",
+              "return_eax": 604220256,
+              "return_fpcw": 3711,
+              "return_pc": "0x4668bd",
+              "return_sp": "0x1007fe50"
+            },
+            {
+              "args": [
+                268959348,
+                0
+              ],
+              "caller": "0x4222e5",
+              "cleanup": 8,
+              "ecx": "0x2403ab60",
+              "entry": "0x5f4ec0",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x1007fdbc",
+              "frame": 3,
+              "name": "Unlimbo",
+              "return_eax": 604207105,
+              "return_fpcw": 3711,
+              "return_pc": "0x4222e5",
+              "return_sp": "0x1007fdc8"
+            }
+          ],
+          "counts": {
+            "anims": 1,
+            "bullets": 7,
+            "pending": 0
+          },
+          "divisions": [
+            {
+              "pc": "0x466846",
+              "remainder": 0
+            }
+          ],
+          "emissions": [
+            {
+              "anim_type": "BBBLELRG",
+              "constructed": {
+                "alive": true,
+                "brand_new": true,
+                "bullet": 0,
+                "delay": 1,
+                "draw_flags": 1536,
+                "loops": 1,
+                "native_id": 17,
+                "owner_object": 0,
+                "position": [
+                  2688,
+                  5248,
+                  624
+                ],
+                "rate": 2,
+                "stage": 0,
+                "step": 1,
+                "timer": [
+                  3,
+                  2
+                ],
+                "z_adjust": 0
+              },
+              "delay": 1,
+              "draw_flags": 1536,
+              "loops": 1,
+              "pointer": 604220256,
+              "position": [
+                2688,
+                5248,
+                624
+              ],
+              "reverse": 0,
+              "z_adjust": 0
+            }
+          ],
+          "name": "enrolled_header_7_frame_3",
+          "raw_draws": [],
+          "retained_position": [
+            2688,
+            5248,
+            624
+          ],
+          "spawn_delay": 3,
+          "stop": "0x4668bd",
+          "supplied": {
+            "alive": true,
+            "allocation_failure": false,
+            "art_delay": null,
+            "flight_velocity": null,
+            "frame": 3,
+            "identity": null,
+            "position": [
+              2688,
+              5248,
+              624
+            ],
+            "random_rate": null,
+            "scaled_delay": null,
+            "trailer": true,
+            "waiting": "no"
+          },
+          "transport": [],
+          "waiting_after": false
+        },
+        "name": "enrolled_header_7_frame_3"
+      },
+      {
+        "action": "enroll",
+        "after": {
+          "count": 8,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 18,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 7,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 3,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 18,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 8,
+        "bullet_type": "Torpedo",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 1,
+          "bullets": 8,
+          "pending": 0
+        },
+        "name": "count_8",
+        "transport": []
+      },
+      {
+        "action": "header",
+        "after": {
+          "count": 8,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before": {
+          "count": 8,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "bullet": 8,
+        "header": {
+          "after_native_id": 18,
+          "after_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "before_native_id": 18,
+          "before_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "bullet_native_id": 18,
+          "calls": [],
+          "counts": {
+            "anims": 1,
+            "bullets": 8,
+            "pending": 0
+          },
+          "divisions": [
+            {
+              "pc": "0x466846",
+              "remainder": 3
+            }
+          ],
+          "emissions": [],
+          "name": "enrolled_header_8_frame_3",
+          "raw_draws": [],
+          "retained_position": [
+            2688,
+            5248,
+            624
+          ],
+          "spawn_delay": 3,
+          "stop": "0x4668bd",
+          "supplied": {
+            "alive": true,
+            "allocation_failure": false,
+            "art_delay": null,
+            "flight_velocity": null,
+            "frame": 3,
+            "identity": null,
+            "position": [
+              2688,
+              5248,
+              624
+            ],
+            "random_rate": null,
+            "scaled_delay": null,
+            "trailer": true,
+            "waiting": "no"
+          },
+          "transport": [],
+          "waiting_after": false
+        },
+        "name": "enrolled_header_8_frame_3"
+      },
+      {
+        "action": "header",
+        "after": {
+          "count": 8,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before": {
+          "count": 8,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "bullet": 8,
+        "header": {
+          "after_native_id": 19,
+          "after_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "before_native_id": 18,
+          "before_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "bullet_native_id": 18,
+          "calls": [
+            {
+              "args": [
+                604207136,
+                268959348,
+                1,
+                1,
+                1536,
+                0,
+                0
+              ],
+              "caller": "0x4668bd",
+              "cleanup": 28,
+              "ecx": "0x2403af10",
+              "emission_index": 0,
+              "entry": "0x421ea0",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x1007fe30",
+              "frame": 4,
+              "name": "AnimCtor",
+              "return_eax": 604221200,
+              "return_fpcw": 3711,
+              "return_pc": "0x4668bd",
+              "return_sp": "0x1007fe50"
+            },
+            {
+              "args": [
+                268959348,
+                0
+              ],
+              "caller": "0x4222e5",
+              "cleanup": 8,
+              "ecx": "0x2403af10",
+              "entry": "0x5f4ec0",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x1007fdbc",
+              "frame": 4,
+              "name": "Unlimbo",
+              "return_eax": 604207105,
+              "return_fpcw": 3711,
+              "return_pc": "0x4222e5",
+              "return_sp": "0x1007fdc8"
+            }
+          ],
+          "counts": {
+            "anims": 2,
+            "bullets": 8,
+            "pending": 0
+          },
+          "divisions": [
+            {
+              "pc": "0x466846",
+              "remainder": 0
+            }
+          ],
+          "emissions": [
+            {
+              "anim_type": "BBBLELRG",
+              "constructed": {
+                "alive": true,
+                "brand_new": true,
+                "bullet": 0,
+                "delay": 1,
+                "draw_flags": 1536,
+                "loops": 1,
+                "native_id": 19,
+                "owner_object": 0,
+                "position": [
+                  2688,
+                  5248,
+                  624
+                ],
+                "rate": 2,
+                "stage": 0,
+                "step": 1,
+                "timer": [
+                  4,
+                  2
+                ],
+                "z_adjust": 0
+              },
+              "delay": 1,
+              "draw_flags": 1536,
+              "loops": 1,
+              "pointer": 604221200,
+              "position": [
+                2688,
+                5248,
+                624
+              ],
+              "reverse": 0,
+              "z_adjust": 0
+            }
+          ],
+          "name": "enrolled_header_8_frame_4",
+          "raw_draws": [],
+          "retained_position": [
+            2688,
+            5248,
+            624
+          ],
+          "spawn_delay": 3,
+          "stop": "0x4668bd",
+          "supplied": {
+            "alive": true,
+            "allocation_failure": false,
+            "art_delay": null,
+            "flight_velocity": null,
+            "frame": 4,
+            "identity": null,
+            "position": [
+              2688,
+              5248,
+              624
+            ],
+            "random_rate": null,
+            "scaled_delay": null,
+            "trailer": true,
+            "waiting": "no"
+          },
+          "transport": [],
+          "waiting_after": false
+        },
+        "name": "enrolled_header_8_frame_4"
+      },
+      {
+        "action": "enroll",
+        "after": {
+          "count": 9,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 8,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 20,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 8,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 20,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 9,
+        "bullet_type": "ScalableTrailerB",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 2,
+          "bullets": 9,
+          "pending": 0
+        },
+        "name": "count_9",
+        "transport": []
+      },
+      {
+        "action": "enroll",
+        "after": {
+          "count": 10,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 8,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 21,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 9,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 8,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 21,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 10,
+        "bullet_type": "Torpedo",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 2,
+          "bullets": 10,
+          "pending": 0
+        },
+        "name": "count_10",
+        "transport": []
+      },
+      {
+        "action": "enroll",
+        "after": {
+          "count": 11,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 22,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 10,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 8,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 22,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 11,
+        "bullet_type": "ScalableTrailerB",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 2,
+          "bullets": 11,
+          "pending": 0
+        },
+        "name": "count_11",
+        "transport": []
+      },
+      {
+        "action": "header",
+        "after": {
+          "count": 11,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before": {
+          "count": 11,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "bullet": 11,
+        "header": {
+          "after_native_id": 23,
+          "after_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "before_native_id": 22,
+          "before_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "bullet_native_id": 22,
+          "calls": [
+            {
+              "args": [
+                604207136,
+                268959348,
+                1,
+                1,
+                1536,
+                0,
+                0
+              ],
+              "caller": "0x4668bd",
+              "cleanup": 28,
+              "ecx": "0x2403b730",
+              "emission_index": 0,
+              "entry": "0x421ea0",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x1007fe30",
+              "frame": 9,
+              "name": "AnimCtor",
+              "return_eax": 604223280,
+              "return_fpcw": 3711,
+              "return_pc": "0x4668bd",
+              "return_sp": "0x1007fe50"
+            },
+            {
+              "args": [
+                268959348,
+                0
+              ],
+              "caller": "0x4222e5",
+              "cleanup": 8,
+              "ecx": "0x2403b730",
+              "entry": "0x5f4ec0",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x1007fdbc",
+              "frame": 9,
+              "name": "Unlimbo",
+              "return_eax": 604207105,
+              "return_fpcw": 3711,
+              "return_pc": "0x4222e5",
+              "return_sp": "0x1007fdc8"
+            }
+          ],
+          "counts": {
+            "anims": 3,
+            "bullets": 11,
+            "pending": 0
+          },
+          "divisions": [
+            {
+              "pc": "0x466846",
+              "remainder": 0
+            }
+          ],
+          "emissions": [
+            {
+              "anim_type": "BBBLELRG",
+              "constructed": {
+                "alive": true,
+                "brand_new": true,
+                "bullet": 0,
+                "delay": 1,
+                "draw_flags": 1536,
+                "loops": 1,
+                "native_id": 23,
+                "owner_object": 0,
+                "position": [
+                  2688,
+                  5248,
+                  624
+                ],
+                "rate": 2,
+                "stage": 0,
+                "step": 1,
+                "timer": [
+                  9,
+                  2
+                ],
+                "z_adjust": 0
+              },
+              "delay": 1,
+              "draw_flags": 1536,
+              "loops": 1,
+              "pointer": 604223280,
+              "position": [
+                2688,
+                5248,
+                624
+              ],
+              "reverse": 0,
+              "z_adjust": 0
+            }
+          ],
+          "name": "enrolled_header_11_frame_9",
+          "raw_draws": [],
+          "retained_position": [
+            2688,
+            5248,
+            624
+          ],
+          "spawn_delay": 7,
+          "stop": "0x4668bd",
+          "supplied": {
+            "alive": true,
+            "allocation_failure": false,
+            "art_delay": null,
+            "flight_velocity": null,
+            "frame": 9,
+            "identity": null,
+            "position": [
+              2688,
+              5248,
+              624
+            ],
+            "random_rate": null,
+            "scaled_delay": null,
+            "trailer": true,
+            "waiting": "no"
+          },
+          "transport": [],
+          "waiting_after": false
+        },
+        "name": "enrolled_header_11_frame_9"
+      },
+      {
+        "action": "expire",
+        "after": {
+          "count": 11,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 23,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 11,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 23,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 5,
+        "bullet_type": "Torpedo",
+        "callbacks": [
+          {
+            "control": false,
+            "expired": 5,
+            "receiver": 1
+          }
+        ],
+        "calls": [],
+        "control": false,
+        "counts": {
+          "anims": 3,
+          "bullets": 11,
+          "pending": 0
+        },
+        "name": "expire_false",
+        "transport": []
+      },
+      {
+        "action": "expire",
+        "after": {
+          "count": 10,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 23,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 11,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 23,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 5,
+        "bullet_type": "Torpedo",
+        "callbacks": [
+          {
+            "control": true,
+            "expired": 5,
+            "receiver": 1
+          }
+        ],
+        "calls": [],
+        "control": true,
+        "counts": {
+          "anims": 3,
+          "bullets": 11,
+          "pending": 0
+        },
+        "name": "expire_true",
+        "transport": []
+      },
+      {
+        "action": "expire",
+        "after": {
+          "count": 10,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 23,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 10,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 23,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 5,
+        "bullet_type": "Torpedo",
+        "callbacks": [
+          {
+            "control": true,
+            "expired": 5,
+            "receiver": 1
+          }
+        ],
+        "calls": [],
+        "control": true,
+        "counts": {
+          "anims": 3,
+          "bullets": 11,
+          "pending": 0
+        },
+        "name": "expire_repeat",
+        "transport": []
+      },
+      {
+        "action": "uninit",
+        "after": {
+          "count": 9,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 23,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 10,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 23,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 11,
+        "bullet_type": "ScalableTrailerB",
+        "callbacks": [
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 1
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 2
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 3
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 4
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 5
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 6
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 7
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 8
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 9
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 10
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 11
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 1
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 2
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 3
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 4
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 5
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 6
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 7
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 8
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 9
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 10
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 11
+          }
+        ],
+        "calls": [
+          {
+            "args": [],
+            "caller": "0x30000000",
+            "cleanup": 0,
+            "ecx": "0x2403b530",
+            "entry": "0x5f65f0",
+            "entry_fpcw": 3711,
+            "entry_sp": "0x10080000",
+            "frame": 9,
+            "name": "UnInit",
+            "return_eax": 0,
+            "return_fpcw": 3711,
+            "return_pc": "0x30000000",
+            "return_sp": "0x10080004"
+          },
+          {
+            "args": [],
+            "caller": "0x5f661b",
+            "cleanup": 0,
+            "ecx": "0x2403b530",
+            "edx_control": 1,
+            "entry": "0x7258d0",
+            "entry_fpcw": 3711,
+            "entry_sp": "0x1007fff8",
+            "frame": 9,
+            "name": "PointerExpired",
+            "return_eax": 8,
+            "return_fpcw": 3711,
+            "return_pc": "0x5f661b",
+            "return_sp": "0x1007fffc"
+          },
+          {
+            "args": [],
+            "caller": "0x5f6625",
+            "cleanup": 0,
+            "ecx": "0x2403b530",
+            "entry": "0x5f4d30",
+            "entry_fpcw": 3711,
+            "entry_sp": "0x1007fff8",
+            "frame": 9,
+            "name": "Conceal",
+            "return_eax": 604216065,
+            "return_fpcw": 3711,
+            "return_pc": "0x5f6625",
+            "return_sp": "0x1007fffc"
+          },
+          {
+            "args": [],
+            "caller": "0x5f5316",
+            "cleanup": 0,
+            "ecx": "0x2403b530",
+            "edx_control": 8275457,
+            "entry": "0x7258d0",
+            "entry_fpcw": 3711,
+            "entry_sp": "0x1007ffb8",
+            "frame": 9,
+            "name": "PointerExpired",
+            "return_eax": 8,
+            "return_fpcw": 3711,
+            "return_pc": "0x5f5316",
+            "return_sp": "0x1007ffbc"
+          }
+        ],
+        "control": null,
+        "counts": {
+          "anims": 3,
+          "bullets": 11,
+          "pending": 1
+        },
+        "name": "full_uninit",
+        "transport": []
+      },
+      {
+        "action": "drain",
+        "after": {
+          "count": 9,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 23,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 9,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 23,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 11,
+        "bullet_type": null,
+        "callbacks": [
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 1
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 2
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 3
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 4
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 5
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 6
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 7
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 8
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 9
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 10
+          },
+          {
+            "control": true,
+            "expired": 11,
+            "receiver": 11
+          }
+        ],
+        "calls": [
+          {
+            "args": [],
+            "caller": "0x30000000",
+            "cleanup": 0,
+            "ecx": "0x0",
+            "entry": "0x725c70",
+            "entry_fpcw": 3711,
+            "entry_sp": "0x10080000",
+            "frame": 9,
+            "name": "Drain",
+            "return_eax": 0,
+            "return_fpcw": 3711,
+            "return_pc": "0x30000000",
+            "return_sp": "0x10080004"
+          },
+          {
+            "args": [],
+            "caller": "0x46b5c8",
+            "cleanup": 0,
+            "ecx": "0x2403b530",
+            "entry": "0x466560",
+            "entry_fpcw": 3711,
+            "entry_sp": "0x1007ffd8",
+            "frame": 9,
+            "name": "BulletDtor",
+            "return_eax": 604222720,
+            "return_fpcw": 3711,
+            "return_pc": "0x46b5c8",
+            "return_sp": "0x1007ffdc"
+          },
+          {
+            "args": [],
+            "caller": "0x466586",
+            "cleanup": 0,
+            "ecx": "0x2403b530",
+            "edx_control": 8275457,
+            "entry": "0x7258d0",
+            "entry_fpcw": 3711,
+            "entry_sp": "0x1007ffcc",
+            "frame": 9,
+            "name": "PointerExpired",
+            "return_eax": 8,
+            "return_fpcw": 3711,
+            "return_pc": "0x466586",
+            "return_sp": "0x1007ffd0"
+          },
+          {
+            "args": [],
+            "caller": "0x4665e9",
+            "cleanup": 0,
+            "ecx": "0x2403b530",
+            "entry": "0x5f4d30",
+            "entry_fpcw": 3711,
+            "entry_sp": "0x1007ffcc",
+            "frame": 9,
+            "name": "Conceal",
+            "return_eax": 0,
+            "return_fpcw": 3711,
+            "return_pc": "0x4665e9",
+            "return_sp": "0x1007ffd0"
+          }
+        ],
+        "control": null,
+        "counts": {
+          "anims": 3,
+          "bullets": 10,
+          "pending": 0
+        },
+        "name": "full_drain",
+        "transport": [
+          {
+            "event": "OSInterlockedDecrement",
+            "field": "0x2403b54c",
+            "result": 0
+          }
+        ]
+      },
+      {
+        "action": "enroll",
+        "after": {
+          "count": 10,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10,
+            12
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 8,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 24,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 9,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "types": {
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 9,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 24,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 12,
+        "bullet_type": "ScalableTrailerB",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 3,
+          "bullets": 11,
+          "pending": 0
+        },
+        "name": "reenroll_after_removal",
+        "transport": []
+      },
+      {
+        "action": "enroll",
+        "after": {
+          "count": 11,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10,
+            12,
+            13
+          ],
+          "types": {
+            "MedusaProjectile": {
+              "base_delay": 2,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": null
+            },
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 8,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "after_native_id": 26,
+        "after_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "before": {
+          "count": 10,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10,
+            12
+          ],
+          "types": {
+            "MedusaProjectile": {
+              "base_delay": 2,
+              "scalable": true,
+              "scaled_delay": 0,
+              "trailer": null
+            },
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 8,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before_native_id": 26,
+        "before_rng": {
+          "main": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          },
+          "scenario": {
+            "cursor": [
+              0,
+              103
+            ],
+            "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+          }
+        },
+        "bullet": 13,
+        "bullet_type": "MedusaProjectile",
+        "callbacks": [],
+        "calls": [],
+        "control": null,
+        "counts": {
+          "anims": 3,
+          "bullets": 12,
+          "pending": 0
+        },
+        "name": "stock_medusa_enroll",
+        "transport": []
+      },
+      {
+        "action": "header",
+        "after": {
+          "count": 11,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10,
+            12,
+            13
+          ],
+          "types": {
+            "MedusaProjectile": {
+              "base_delay": 2,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": null
+            },
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 8,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "before": {
+          "count": 11,
+          "members": [
+            1,
+            2,
+            3,
+            4,
+            6,
+            7,
+            8,
+            9,
+            10,
+            12,
+            13
+          ],
+          "types": {
+            "MedusaProjectile": {
+              "base_delay": 2,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": null
+            },
+            "ScalableTrailerB": {
+              "base_delay": 7,
+              "scalable": true,
+              "scaled_delay": 8,
+              "trailer": "BBBLELRG"
+            },
+            "Torpedo": {
+              "base_delay": 3,
+              "scalable": true,
+              "scaled_delay": 4,
+              "trailer": "BBBLELRG"
+            }
+          }
+        },
+        "bullet": 13,
+        "header": {
+          "after_native_id": 26,
+          "after_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "before_native_id": 26,
+          "before_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "bullet_native_id": 26,
+          "calls": [],
+          "counts": {
+            "anims": 3,
+            "bullets": 12,
+            "pending": 0
+          },
+          "divisions": [],
+          "emissions": [],
+          "name": "stock_medusa_null_trailer",
+          "raw_draws": [],
+          "retained_position": [
+            2688,
+            5248,
+            624
+          ],
+          "spawn_delay": 2,
+          "stop": "0x4668bd",
+          "supplied": {
+            "alive": true,
+            "allocation_failure": false,
+            "art_delay": null,
+            "flight_velocity": null,
+            "frame": 12,
+            "identity": null,
+            "position": [
+              2688,
+              5248,
+              624
+            ],
+            "random_rate": null,
+            "scaled_delay": null,
+            "trailer": true,
+            "waiting": "no"
+          },
+          "transport": [],
+          "waiting_after": false
+        },
+        "name": "stock_medusa_null_trailer"
+      }
+    ],
+    "sole_retirement": {
+      "authored_rules": {
+        "Torpedo": {
+          "Image": "SUBT",
+          "Scalable": "yes"
+        }
+      },
+      "reader_admitted": true,
+      "rows": [
+        {
+          "action": "enroll",
+          "after": {
+            "count": 1,
+            "members": [
+              1
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": 3,
+                "scalable": true,
+                "scaled_delay": 3,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          "after_native_id": 9,
+          "after_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "before": {
+            "count": 0,
+            "members": [],
+            "types": {
+              "Torpedo": {
+                "base_delay": 3,
+                "scalable": true,
+                "scaled_delay": 0,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          "before_native_id": 9,
+          "before_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "bullet": 1,
+          "bullet_type": "Torpedo",
+          "callbacks": [],
+          "calls": [],
+          "control": null,
+          "counts": {
+            "anims": 0,
+            "bullets": 1,
+            "pending": 0
+          },
+          "name": "sole_enroll",
+          "transport": []
+        },
+        {
+          "action": "uninit",
+          "after": {
+            "count": 0,
+            "members": [],
+            "types": {
+              "Torpedo": {
+                "base_delay": 3,
+                "scalable": true,
+                "scaled_delay": 3,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          "after_native_id": 9,
+          "after_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "before": {
+            "count": 1,
+            "members": [
+              1
+            ],
+            "types": {
+              "Torpedo": {
+                "base_delay": 3,
+                "scalable": true,
+                "scaled_delay": 3,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          "before_native_id": 9,
+          "before_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "bullet": 1,
+          "bullet_type": "Torpedo",
+          "callbacks": [
+            {
+              "control": true,
+              "expired": 1,
+              "receiver": 1
+            },
+            {
+              "control": true,
+              "expired": 1,
+              "receiver": 1
+            }
+          ],
+          "calls": [
+            {
+              "args": [],
+              "caller": "0x30000000",
+              "cleanup": 0,
+              "ecx": "0x24039520",
+              "entry": "0x5f65f0",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x10080000",
+              "frame": 0,
+              "name": "UnInit",
+              "return_eax": 0,
+              "return_fpcw": 3711,
+              "return_pc": "0x30000000",
+              "return_sp": "0x10080004"
+            },
+            {
+              "args": [],
+              "caller": "0x5f661b",
+              "cleanup": 0,
+              "ecx": "0x24039520",
+              "edx_control": 1,
+              "entry": "0x7258d0",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x1007fff8",
+              "frame": 0,
+              "name": "PointerExpired",
+              "return_eax": 8,
+              "return_fpcw": 3711,
+              "return_pc": "0x5f661b",
+              "return_sp": "0x1007fffc"
+            },
+            {
+              "args": [],
+              "caller": "0x5f6625",
+              "cleanup": 0,
+              "ecx": "0x24039520",
+              "entry": "0x5f4d30",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x1007fff8",
+              "frame": 0,
+              "name": "Conceal",
+              "return_eax": 604201473,
+              "return_fpcw": 3711,
+              "return_pc": "0x5f6625",
+              "return_sp": "0x1007fffc"
+            },
+            {
+              "args": [],
+              "caller": "0x5f5316",
+              "cleanup": 0,
+              "ecx": "0x24039520",
+              "edx_control": 8275457,
+              "entry": "0x7258d0",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x1007ffb8",
+              "frame": 0,
+              "name": "PointerExpired",
+              "return_eax": 8,
+              "return_fpcw": 3711,
+              "return_pc": "0x5f5316",
+              "return_sp": "0x1007ffbc"
+            }
+          ],
+          "control": null,
+          "counts": {
+            "anims": 0,
+            "bullets": 1,
+            "pending": 1
+          },
+          "name": "sole_uninit",
+          "transport": []
+        },
+        {
+          "action": "drain",
+          "after": {
+            "count": 0,
+            "members": [],
+            "types": {
+              "Torpedo": {
+                "base_delay": 3,
+                "scalable": true,
+                "scaled_delay": 3,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          "after_native_id": 9,
+          "after_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "before": {
+            "count": 0,
+            "members": [],
+            "types": {
+              "Torpedo": {
+                "base_delay": 3,
+                "scalable": true,
+                "scaled_delay": 3,
+                "trailer": "BBBLELRG"
+              }
+            }
+          },
+          "before_native_id": 9,
+          "before_rng": {
+            "main": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            },
+            "scenario": {
+              "cursor": [
+                0,
+                103
+              ],
+              "sha256": "8604aec210a8ef4bb6754457651648dac72b66e2785b6aba5a007f6a0fa9eeb6"
+            }
+          },
+          "bullet": 1,
+          "bullet_type": null,
+          "callbacks": [
+            {
+              "control": true,
+              "expired": 1,
+              "receiver": 1
+            }
+          ],
+          "calls": [
+            {
+              "args": [],
+              "caller": "0x30000000",
+              "cleanup": 0,
+              "ecx": "0x0",
+              "entry": "0x725c70",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x10080000",
+              "frame": 0,
+              "name": "Drain",
+              "return_eax": 0,
+              "return_fpcw": 3711,
+              "return_pc": "0x30000000",
+              "return_sp": "0x10080004"
+            },
+            {
+              "args": [],
+              "caller": "0x46b5c8",
+              "cleanup": 0,
+              "ecx": "0x24039520",
+              "entry": "0x466560",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x1007ffd8",
+              "frame": 0,
+              "name": "BulletDtor",
+              "return_eax": 604214528,
+              "return_fpcw": 3711,
+              "return_pc": "0x46b5c8",
+              "return_sp": "0x1007ffdc"
+            },
+            {
+              "args": [],
+              "caller": "0x466586",
+              "cleanup": 0,
+              "ecx": "0x24039520",
+              "edx_control": 8275457,
+              "entry": "0x7258d0",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x1007ffcc",
+              "frame": 0,
+              "name": "PointerExpired",
+              "return_eax": 8,
+              "return_fpcw": 3711,
+              "return_pc": "0x466586",
+              "return_sp": "0x1007ffd0"
+            },
+            {
+              "args": [],
+              "caller": "0x4665e9",
+              "cleanup": 0,
+              "ecx": "0x24039520",
+              "entry": "0x5f4d30",
+              "entry_fpcw": 3711,
+              "entry_sp": "0x1007ffcc",
+              "frame": 0,
+              "name": "Conceal",
+              "return_eax": 0,
+              "return_fpcw": 3711,
+              "return_pc": "0x4665e9",
+              "return_sp": "0x1007ffd0"
+            }
+          ],
+          "control": null,
+          "counts": {
+            "anims": 0,
+            "bullets": 0,
+            "pending": 0
+          },
+          "name": "sole_drain",
+          "transport": [
+            {
+              "event": "OSInterlockedDecrement",
+              "field": "0x2403953c",
+              "result": 0
+            }
+          ]
+        }
+      ]
+    }
+  },
   "scenario_rng_seed": 31,
   "schema": 1,
   "seeded_rng_state_hex": "0000000000000000670000007d8d3bb774572455b434a5f30ce9e4f005a0e3b4758cdee8a6bbbcc84508d168b73af1642547b1baa1f60a2bee68538bb5c0422d7371cdea5cd358054a832e0b2513295b2fa6c22ddebf08382d79e5590794753d08a63e9f81a42283e74aee997f69b520dde807ff718dfb6e36926ec78425ae2e85e645ac85f787b5fc95b15362269ce187ca057a03f779933bcb1c6e207782d8ad5a4d904c590afb1b8d491b7996901ef35ad76acbf963ea662f651f59a2b7c0935cfb3e714bdcfabb9fc0bc485677c09a8b78a9baae0c3c44a06c2de7c3320a0e238449f12a0fb0494ce64229262e65fc3a05dc5c3106a80d7662e4fa0e825879ef2b335f641a63c47cbc47cc076256f953aa0fc5b6ee6a143abe13f4f838ec925e06a2e86fd641be52f5c9f0fa224e4572d4aa75f3bf2e89568d90e2d5ce80ed080c147de64a410eac7e76ae1d40d7d5c0d5a498705ed9d4f7a366265fb40a884bfa3b2f52bb09d2363fa82ec68b26f914a2264818e776c84f631235c25530493f97055f97f6749a66bb5822c2d8842e72d06ab30490581a17f48b767f9ff2e17257f9a6896eeb2ef4f8cfe1fe7dddac1f0277aa9577a9ee7585b21518b6cabfe9f3a1e895bce9b4cde34b0943ea94850845280bbeea4dbcee783a7fc96867bf456cf26ad773bee474d851d17ea98be8d5c502cba200fd8a144ac8ca52223203574ff1f74b8175b98f937916f85049919d4ab1fe175d98569828d29836f3e362496b458584bf80b2a6abd08935d9bfae3247fe3731a19951e89a09f583cd24b33fc310f5acbbac56615cc6f5a4e5b32b91a769e34d6be26bd1e11edb2e397109862492c9412e4a79fe6ee0ae98df206f7b94d559a2485b6f57589f631fc6265c040896cb81f8ffc789c16eabb99d80939e64fa257641dc2cba6e7ff47b640517f85cd89f41b8f6476b8a17714969bf7c900f0e9eb6e81f672d0140803403302739e4c708113faa50152f09cd9349c15e15c4882ec108a0eba147524827c1397100c787ac53db5a626ae2b2055c4182a7ddc0665e0dfc6ba9ec12b9d509a86b1be4c61c8d0ecfe1025617b35a13a7ff5158d8b0399b7708ab07724738060a6fb9cfc3f02c8e18c12c84c45380378305b44513d23ab0e97aafa0edd10d0da130b9edda65a3785144a37bbead9a326c05585309ee3c0e3be6b9ecf8fdce1a1ddef39f181d9cfd8f52177bc90d2ac6f9b89d7e1763be0e61ce30418bddde52e4df6e98046dfd0ff036f03a1af83be02c34c0e78b1480aaba74da45871d1d18f3c65059ec2ef905a09b62fb796f8996c3f9081f445e6c28119e2d72223bb105a063cc9f438de40254f6b99c237b928a10dcb6f25f93400b1222bc2f1f91197c70336006f15798cf23b09a7820b123e71776aab17a49",

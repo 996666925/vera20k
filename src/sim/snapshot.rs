@@ -1044,8 +1044,9 @@ use crate::sim::world::Simulation;
 // installed WeaponType replace the conflated payload weapon identity.
 // 364 -> 365: RadSite creation order survives saves; native updates reverse
 // creation order, which affects rounded field subtraction and later damage.
-// 365 -> 366: authoritative PlanMgr nodes/tokens and local planning input mode.
-const SNAPSHOT_VERSION: u32 = 366;
+// 365 -> 366: process scalable Bullet order and retained type cadence values.
+// 366 -> 367: authoritative PlanMgr nodes/tokens and local planning input mode.
+const SNAPSHOT_VERSION: u32 = 367;
 
 const SNAPSHOT_PRODUCT_MAGIC: [u8; 8] = *b"VERA20K\0";
 const SNAPSHOT_ENVELOPE_VERSION: u32 = 1;
@@ -1234,6 +1235,8 @@ pub enum SnapshotError {
 /// Structural failures found before a deserialized simulation is admitted.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SnapshotRestoreError {
+    #[error("invalid scalable Bullet runtime: {0}")]
+    InvalidScalableProjectileRuntime(&'static str),
     #[error("invalid radiation site order: {0}")]
     InvalidRadiationSiteOrder(&'static str),
     #[error("entity {object_id} has invalid Tesla charging state: {reason}")]
@@ -2525,6 +2528,9 @@ impl Simulation {
     /// weak/derived identities, and reconstructs skipped indexes in dependency
     /// order.
     pub(crate) fn restore_after_snapshot_load(&mut self) -> Result<(), SnapshotRestoreError> {
+        self.projectiles
+            .validate_scalable_runtime(&self.interner)
+            .map_err(SnapshotRestoreError::InvalidScalableProjectileRuntime)?;
         self.radiation
             .validate_site_order()
             .map_err(SnapshotRestoreError::InvalidRadiationSiteOrder)?;
@@ -2728,6 +2734,7 @@ impl Simulation {
                 .arm_timer
                 .start(self.session.binary_frame as i32, 0);
         }
+        self.projectiles.restore_scalable_after_load();
         // ParasiteClass Load 6295DB..6295F3 does the same for its suppression
         // and bite timers: a bite is due at once and suppression is dropped.
         let frame = self.session.binary_frame;
@@ -4519,8 +4526,9 @@ mod tests {
         // 362 -> 363: retained Scenario countdown and sidebar cameo flash deadlines.
         // 363 -> 364: independent Bullet constructor and installed-weapon fields.
         // 364 -> 365: retained RadSite creation/update order.
-        // 365 -> 366: synchronized planning nodes, paths and local input mode.
-        assert_eq!(super::SNAPSHOT_VERSION, 366);
+        // 365 -> 366: process scalable Bullet order and type cadence.
+        // 366 -> 367: synchronized planning nodes, paths and local input mode.
+        assert_eq!(super::SNAPSHOT_VERSION, 367);
     }
 
     #[test]

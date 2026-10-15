@@ -1281,30 +1281,35 @@ enum ProjectileAiPhase {
     Flight(ProjectileCoord),
 }
 
-impl ProjectileAiHead {
+impl ProjectileStore {
     /// Original Bullet466826..4668B8: a type's Trailer is constructed at the
     /// pre-flight Object Location on a global signed-frame cadence. The Anim
     /// constructor, not this producer, owns any identity/RNG consumption.
     /// Native executable comparisons: tools/projectile_oracle/projectile_trailer.json.
     pub(crate) fn trailer<'a>(
         &self,
+        head: &ProjectileAiHead,
         kind: &'a crate::rules::projectile_type::ProjectileType,
         binary_frame: u32,
     ) -> Option<(&'a str, ProjectileCoord)> {
-        let ProjectileAiPhase::Flight(position) = self.phase else {
+        let ProjectileAiPhase::Flight(position) = head.phase else {
             return None;
         };
         let name = kind.trailer.as_deref()?;
-        // RESIDUAL: authored Scalable+Trailer needs InitScalable46B280's
-        // process-wide list and type-level ScaledSpawnDelay46C840, including
-        // removal and save/load. Keep that unsupported producer absent instead
-        // of inventing its cadence. The ordinary retail emitting types leave
-        // Scalable false; Torpedo uses retained SpawnDelay3.
-        if kind.scalable {
-            return None;
-        }
+        // Original466826 checks Trailer before466834 reads the retained
+        // type's scaled delay. Its current Scalable flag does not gate this
+        // read; an override survives removal of the last enrolled Bullet.
+        let scaled = self
+            .get(head.id)
+            .and_then(|bullet| bullet.payload.projectile_type())
+            .map_or(0, |kind| self.scaled_spawn_delay(kind));
+        let delay = if scaled != 0 {
+            scaled
+        } else {
+            kind.spawn_delay
+        };
         let remainder = (binary_frame as i32)
-            .checked_rem(kind.spawn_delay)
+            .checked_rem(delay)
             .expect("Bullet Trailer native IDIV requires a nonzero, nonoverflowing SpawnDelay");
         (remainder == 0).then_some((name, position))
     }
@@ -1335,9 +1340,104 @@ impl ProjectileAdvanceResult {
 #[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ProjectileStore {
     projectiles: BTreeMap<u64, Projectile>,
+    /// Original process vector89DE18: enrollment order, independently of
+    /// Bullet storage/Logic order. Duplicate InitScalable calls append twice.
+    scalable_members: Vec<u64>,
+    /// BulletType+2E8 runtime values, keyed by the retained type identity.
+    /// Missing is constructor zero; zero writes remove the redundant entry.
+    scaled_spawn_delays: BTreeMap<InternedId, i32>,
 }
 
 impl ProjectileStore {
+    /// Unit741439 calls InitScalable46B280 only for its non-null returned
+    /// Bullet whose CURRENT retained type is Scalable. Generic construction
+    /// and Fire do not enroll. No RNG/timer or per-Bullet cadence is added.
+    pub(crate) fn init_scalable(
+        &mut self,
+        id: u64,
+        kind: &crate::rules::projectile_type::ProjectileType,
+    ) {
+        let Some(type_id) = self
+            .get(id)
+            .and_then(|bullet| bullet.payload.projectile_type())
+        else {
+            return;
+        };
+        if !kind.scalable {
+            return;
+        }
+        self.scalable_members.push(id);
+        //46B2D6..46B302: signed count-5/clamp, signed IMUL division by3,
+        // then wrapping base addition. Consumed native threshold/overflow
+        // controls: projectile_trailer.json::scalable_controls.
+        let count =
+            i32::try_from(self.scalable_members.len()).expect("native scalable vector count");
+        let delay = kind
+            .spawn_delay
+            .wrapping_add(count.wrapping_sub(5).max(0) / 3);
+        self.set_scaled_spawn_delay(type_id, delay);
+    }
+
+    fn set_scaled_spawn_delay(&mut self, type_id: InternedId, delay: i32) {
+        if delay == 0 {
+            self.scaled_spawn_delays.remove(&type_id);
+        } else {
+            self.scaled_spawn_delays.insert(type_id, delay);
+        }
+    }
+
+    pub(crate) fn scaled_spawn_delay(&self, type_id: InternedId) -> i32 {
+        self.scaled_spawn_delays.get(&type_id).copied().unwrap_or(0)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn scalable_members(&self) -> &[u64] {
+        &self.scalable_members
+    }
+
+    pub(crate) fn hash_scalable_runtime(&self, hasher: &mut impl std::hash::Hasher) {
+        use std::hash::Hash;
+        if !self.scalable_members.is_empty() || !self.scaled_spawn_delays.is_empty() {
+            b"bullet-scalable-runtime-v1".hash(hasher);
+            self.scalable_members.hash(hasher);
+            self.scaled_spawn_delays.hash(hasher);
+        }
+    }
+
+    pub(crate) fn validate_scalable_runtime(
+        &self,
+        interner: &crate::sim::intern::StringInterner,
+    ) -> Result<(), &'static str> {
+        for id in &self.scalable_members {
+            let Some(type_id) = self
+                .get(*id)
+                .and_then(|bullet| bullet.payload.projectile_type())
+            else {
+                return Err("scalable member must reference a stored typed Bullet");
+            };
+            if interner.try_resolve(type_id).is_none() {
+                return Err("scalable member type must resolve in the interner");
+            }
+        }
+        for (&type_id, &delay) in &self.scaled_spawn_delays {
+            if interner.try_resolve(type_id).is_none() {
+                return Err("scaled delay type must resolve in the interner");
+            }
+            if delay == 0 {
+                return Err("zero scaled delay must use the constructor default");
+            }
+        }
+        Ok(())
+    }
+
+    /// Normal native LoadContent67E739 clears the old scene; BulletLoad
+    /// 46AE70 does not reenroll loaded Bullets. BulletTypeSave46C730/Load
+    /// 46C6A0 preserve raw+2E8. Mechanical serde/Clone retain both states;
+    /// only the world's existing native-load boundary calls this method.
+    pub(crate) fn restore_scalable_after_load(&mut self) {
+        self.scalable_members.clear();
+    }
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -1394,22 +1494,41 @@ impl ProjectileStore {
     /// Source and target are independent arms: when both match the expired
     /// object, both change in the same synchronous callback. The projectile
     /// itself remains stored and registered; repeated callbacks are no-ops.
+    /// None means no present subscriber. Some returns whether another
+    /// scalable-list match remains after this callback's first removal,
+    /// when that arm was enabled. Once false, the same broadcast can skip
+    /// further scans; a disabled arm returns Some(false) without scanning.
     pub(crate) fn pointer_expired(
         &mut self,
         projectile_id: u64,
         expired_id: u64,
         replacement_target: ProjectileTarget,
-    ) -> bool {
-        let Some(projectile) = self.projectiles.get_mut(&projectile_id) else {
-            return false;
-        };
+        expired_scalable_bullet_uninit: bool,
+    ) -> Option<bool> {
+        let projectile = self.projectiles.get_mut(&projectile_id)?;
         if projectile.source_id == expired_id {
             projectile.source_id = crate::sim::combat::RAD_NO_ATTACKER;
         }
         if projectile.target.object_id() == Some(expired_id) {
             projectile.target = replacement_target;
         }
-        true
+        //4685CC..46865D: only a PRESENT Bullet subscriber, control!=0,
+        // expired RTTI8/current type.Scalable removes its FIRST matching
+        // process-vector entry. Each subscriber can remove another duplicate;
+        // no remove-all/death scan or cadence recomputation belongs here.
+        if expired_scalable_bullet_uninit
+            && let Some(index) = self
+                .scalable_members
+                .iter()
+                .position(|&id| id == expired_id)
+        {
+            self.scalable_members.remove(index);
+            // The removed entry was the first match, so only its surviving
+            // suffix can hold another. Avoid rescanning known misses at the
+            // remaining Bullet subscribers in the same common broadcast.
+            return Some(self.scalable_members[index..].contains(&expired_id));
+        }
+        Some(false)
     }
 
     /// Supply a constructed/in-flight Bullet boundary for a focused fixture.

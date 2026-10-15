@@ -8281,7 +8281,7 @@ fn fire_admission_preserves_flat_projectile_layer_through_save_and_retirement() 
             .sim;
         restored.restore_after_snapshot_load().unwrap();
         assert_eq!(restored.substrate.display.members(layer), [id]);
-        assert!(restored.retire_non_entity_object(id));
+        assert!(restored.retire_non_entity_object(id, crate::sim::world::UninitContext::default()));
         assert_eq!(restored.substrate.display.layer_of(id), None);
         assert!(
             restored.projectiles.get(id).is_some(),

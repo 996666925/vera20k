@@ -2896,7 +2896,11 @@ impl Simulation {
     ///
     /// gamemd-derived: active YR `DrainDeferredFinalizationQueue @ 0x00725C70`
     /// performs scalar destruction/freeing only after the frame commit.
-    pub(crate) fn retire_non_entity_object(&mut self, stable_id: u64) -> bool {
+    pub(crate) fn retire_non_entity_object(
+        &mut self,
+        stable_id: u64,
+        context: UninitContext<'_>,
+    ) -> bool {
         let represented = matches!(
             self.classify_object(stable_id),
             Some(ObjectKind::Terrain | ObjectKind::Projectile | ObjectKind::Wave)
@@ -2908,10 +2912,10 @@ impl Simulation {
             // `ObjectClass::UnInit @ 0x005F65F0` broadcasts the bullet's
             // expiry before it leaves Logic; an anim riding it ends
             // (`AnimClass::PointerExpired @ 0x00425150`, `+0x17C`).
-            self.notify_pointer_expired(stable_id, UninitContext::default());
+            self.notify_pointer_expired(stable_id, context);
             // ObjectLimbo5F4D61 repeats DetachAll before removing the fired
             // Bullet's membership. The later scalar destructor repeats once.
-            self.notify_pointer_expired(stable_id, UninitContext::default());
+            self.notify_pointer_expired(stable_id, context);
         }
         // The same UnInit's Limbo (vt+0xD4) detaches a dying tree's custom
         // sound (`object_sound`).
@@ -2949,7 +2953,7 @@ impl Simulation {
             self.resolved_terrain.as_mut(),
         );
         if finalized {
-            let retired = self.retire_non_entity_object(lethal.stable_id);
+            let retired = self.retire_non_entity_object(lethal.stable_id, context);
             debug_assert!(retired);
         }
         finalized
@@ -4849,6 +4853,12 @@ impl Simulation {
         } else {
             acting
         });
+        // Call-local only: learn the gate at the first actual Bullet callback,
+        // then retain its proven lack of further matches. RuleSet/type remain
+        // immutable through this broadcast; Unit741439 only enrolls a fresh
+        // returned Bullet, never this old expired identity. Unrelated nested
+        // births therefore cannot invalidate absence. No state/order changes.
+        let mut scalable_expiry_pending = None;
         for (listener_id, kind) in listeners {
             // A callback may have removed a later listener; an ID never
             // moves to another store. An entity listener is read once, for
@@ -5034,6 +5044,22 @@ impl Simulation {
                     .particle_systems
                     .pointer_expired(listener_id, expired_id);
             } else if kind == ObjectKind::Projectile {
+                // Original4685CC gates only the scalable-list arm on
+                // control!=0, expired RTTI8 and its current retained type.
+                // Read before the expiring Bullet/type is removed; this
+                // includes its own registered subscriber during dtor466581.
+                let expired_scalable_bullet_uninit =
+                    *scalable_expiry_pending.get_or_insert_with(|| {
+                        control == PointerExpiryControl::Uninit
+                            && self
+                                .projectiles
+                                .get(expired_id)
+                                .and_then(|bullet| bullet.payload.projectile_type())
+                                .and_then(|type_id| {
+                                    context.rules()?.projectile(self.interner.resolve(type_id))
+                                })
+                                .is_some_and(|kind| kind.scalable)
+                    });
                 let target_matches = self
                     .projectiles
                     .get(listener_id)
@@ -5043,12 +5069,13 @@ impl Simulation {
                 } else {
                     ProjectileTarget::None
                 };
-                let present = self.projectiles.pointer_expired(
+                let remaining = self.projectiles.pointer_expired(
                     listener_id,
                     expired_id,
                     projectile_replacement_target,
+                    expired_scalable_bullet_uninit,
                 );
-                debug_assert!(present);
+                scalable_expiry_pending = Some(remaining.expect("present Bullet subscriber"));
                 #[cfg(test)]
                 if let Some((source_id, target)) = self
                     .projectiles

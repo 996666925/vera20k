@@ -1608,6 +1608,20 @@ pub(super) fn emit_admitted_fire(
         overlay_registry,
         effects,
     );
+    // UnitClass::Fire741340 wraps the base FireAt6FDD50 (7413CE).
+    // Only its non-null return/current retained BulletType.Scalable reaches
+    // InitScalable46B280 at741439. This existing class-FireAt owner serves
+    // UnitTarget and direct mission calls; constructors/shrapnel/other
+    // classes never pass this Unit-only postprocessing boundary.
+    if snap.category == EntityCategory::Unit
+        && let Some(kind) = world
+            .projectiles
+            .get(bullet_id)
+            .and_then(|bullet| bullet.payload.projectile_type())
+            .and_then(|type_id| rules.projectile(world.interner.resolve(type_id)))
+    {
+        world.projectiles.init_scalable(bullet_id, kind);
+    }
     Some(bullet_id)
 }
 

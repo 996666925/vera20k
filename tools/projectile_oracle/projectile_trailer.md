@@ -129,11 +129,55 @@ and Torpedo from this table; ChemMissile and DredMissile are outside that
 registered inventory. This does not declare their native paths unreachable.
 
 The separate scalable producer `Bullet::InitScalable46B280` appends to the
-global list `89DE18` and calls type setter `46C840`; Unit fire admits it at
-`741427..741439` only for `Scalable=true`. The corpus executes the setter
-with supplied scaled values, not that list's producer/cleanup. Authored
-`Scalable=true` together with a trailer therefore needs the real list
-lifecycle; using base delay as a silent substitute is not established here.
+process vector `89DE18` and calls type setter `46C840`; actual Unit fire admits
+it at `741427..741439` only for `Scalable=true`. The appended
+`scalable_controls` executes the whole original producer against constructed
+Bullets and native type/ART readers. It preserves the original 38 header rows,
+54-type inventory and every other existing payload field.
+
+The main history enrolls eleven Bullets using authored Scalable Torpedo
+(base delay 3) and a second authored type (base delay 7). It records ordered
+membership, the global count and both retained type overrides at each action.
+The original count-5 clamp and signed multiply-high division at
+`46B2D6..46B2F7` produce the override; no Python implementation computes an
+expected delay. Header calls use that output directly: count 8 changes the
+first type's cadence to 4, while count 11 changes the second type's to 9.
+Changing one type leaves the other type's override retained. Two additional
+histories use native ART readers for signed extreme base delays and eight whole
+enrollments each, observing the wrapping base-plus-count addition.
+
+Direct original `PointerExpired4684E0` controls distinguish false/true control,
+first matching pointer removal, stable compaction and repeated expiry. Full
+`UnInit5F65F0` and `Drain725C70` execute separately. The sole-member control
+records its self callbacks: membership empties during UnInit before deferred
+destruction and remains empty after the destructor's later callback. Removal
+does not recalculate type overrides; re-enrollment of the second type after
+removal changes its override from 9 to 8. No list operation draws RNG or allocates
+an Abstract ID. The existing Anim owner performs real header emissions and
+records their constructor state, IDs and both RNG streams.
+
+The stock Medusa control executes its full selected-layer type readers, enrolls
+it in the same process list and executes the header. Its retained null Trailer
+skips emission before cadence. Its generic configured weapon/target, supplied
+incoming pose and direct InitScalable invocation are fixture inputs: this is not
+an original AEGIS/UnitFire launch or a demonstrated stock visual mismatch. The
+production Rust UnitFire control owns that upstream integration separately.
+
+`initialize_scalable_vector` executes original `4662E0..466316` only in these
+new histories, stopping before CRT exit registration. The existing guided-world
+initializer slice ends before pointer `81282C`; it does not initialize this
+vector. Native vector growth executes against the existing allocator transport.
+Full CRT startup/atexit, allocation-failure recovery, complete Logic scheduling,
+native save/load graph and full retail match parity remain outside this corpus.
+No scalable admission, count, cadence or cleanup result is supplied by a hook.
+
+Native persistence differs between the two states: type `+2E8` lies in the raw
+`2F8` bytes written by `46C730→5F9950→410320`; `46C6A0` restores it without
+reapplying normal subclass defaults. The process membership list is not part of
+that type or Bullet raw data, and Bullet Load `46AE70` does not re-enroll it.
+Normal ClearScene `6851F0→534450` retires old Bullets before types; new loaded
+Bullets therefore start outside the list while saved type overrides remain.
+This is original body/caller evidence, not an executed full SaveGame comparison.
 
 ## Reproduce
 

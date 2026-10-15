@@ -2258,7 +2258,7 @@ impl Simulation {
             // represents that same-frame deferred cleanup window.
             self.waves.spawn(stable_id, wave);
             self.active_wave_links.insert(attacker_id, stable_id);
-            let retired = self.retire_non_entity_object(stable_id);
+            let retired = self.retire_non_entity_object(stable_id, UninitContext::default());
             debug_assert!(retired);
             return;
         }

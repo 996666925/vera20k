@@ -105,6 +105,16 @@ def prepare(*, delay=None, trailer=True, random_rate=None, admit=True):
                          physical_art_keys=art['BBBLELRG'], asset_loads=m.asset_loaded)
     initialize_effect_world(m, cells)
     u.mem_write(0x886B88, seeded_struct(31))
+    b, references = construct_bullet(m, p, w, cells)
+    initialize_empty_windows_seh(u)
+    admission = fire_bullet(m, b, (2688, 5248, 624)) if admit else None
+    return m, b, p, cells, dict(constructor=ctor, layers=layers, anim_type=anim_type,
+                               bullet_addref=references, admission=admission)
+
+
+def construct_bullet(m, p, w, cells):
+    """Shared original constructor, AddRef and Configure owner for this corpus."""
+    u = m.u
     b = m.alloc(0x180)
     m.invoke(0x466380, b)
     references = []
@@ -117,10 +127,7 @@ def prepare(*, delay=None, trailer=True, random_rate=None, admit=True):
     m.invoke(0x4664C0, b, (p, cells[16, 20], 0, m.read32(w + 0xA4),
                           m.read32(w + 0xAC), m.read32(w + 0xA8), 0))
     u.mem_write(b + 0x130, dwords(w))
-    initialize_empty_windows_seh(u)
-    admission = fire_bullet(m, b, (2688, 5248, 624)) if admit else None
-    return m, b, p, cells, dict(constructor=ctor, layers=layers, anim_type=anim_type,
-                               bullet_addref=references, admission=admission)
+    return b, references
 
 
 def rng_state(m):
@@ -345,8 +352,8 @@ class Observation:
 def run_case(name, *, frame=3, identity=None, delay=None, scaled=0, alive=True,
              waiting='no', trailer=True, allocation_failure=False,
              position=(2688, 5248, 624), random_rate=None, lifecycle=False, flight=False,
-             expect_divide_fault=False):
-    m, b, p, cells, inputs = prepare(delay=delay, trailer=trailer, random_rate=random_rate)
+             expect_divide_fault=False, prepared=None):
+    m, b, p, cells, inputs = prepared if prepared is not None else prepare(delay=delay, trailer=trailer, random_rate=random_rate)
     u = m.u
     u.mem_write(0xA8ED84, dwords(frame))
     u.mem_write(b + 0x9C, dwords(*position))
@@ -356,7 +363,8 @@ def run_case(name, *, frame=3, identity=None, delay=None, scaled=0, alive=True,
     u.mem_write(b + 0x158, bytes([waiting != 'no']))
     if waiting == 'attached':
         u.mem_write(b + 0x154, dwords(m.alloc(0x1C8)))
-    m.invoke(0x46C840, p, (scaled,))
+    if scaled is not None:
+        m.invoke(0x46C840, p, (scaled,))
     if flight:
         u.mem_write(b + 0xE8, struct.pack('<3d', 30.0, 0.0, 0.0))
         reference = m.alloc(12)
@@ -445,6 +453,178 @@ def run_case(name, *, frame=3, identity=None, delay=None, scaled=0, alive=True,
     return row, inputs
 
 
+def initialize_scalable_vector(m):
+    """Original CRT initializer writes; stop before unsupported CRT atexit."""
+    m.u.reg_write(UC_X86_REG_ESP, SP)
+    run_checked(m.u, 0x4662E0, 0x466316)
+    if (i32(m.u, 0x89DE28), i32(m.u, 0x89DE2C)) != (0, 10):
+        raise AssertionError('Original Scalable vector initializer did not finish')
+
+
+def scalable_state(m, types, bullets):
+    u = m.u
+    n = i32(u, 0x89DE28)
+    data = m.read32(0x89DE1C)
+    return dict(members=[bullets[m.read32(data + i * 4)] for i in range(n)], count=n,
+                types={name: dict(base_delay=i32(u, p + 0x2E4), scaled_delay=i32(u, p + 0x2E8),
+                                 scalable=bool(u.mem_read(p + 0x2EC, 1)[0]),
+                                 trailer=m.string(m.read32(p + 0x2D8) + 0x24) if m.read32(p + 0x2D8) else None)
+                       for name, p in types.items()})
+
+
+def scalable_action(m, name, kind, pointer, receiver, bullets, types, *, control=None):
+    u = m.u
+    before_rng = rng_state(m)
+    before_id = i32(u, m.read32(0xA8B230) + 0x214)
+    before = scalable_state(m, types, bullets)
+    observation = Observation(m)
+    callbacks = []
+
+    def observe_callback(u, pc, _size, _data):
+        if pc == 0x4684E0:
+            sp = u.reg_read(UC_X86_REG_ESP)
+            callbacks.append(dict(receiver=bullets.get(u.reg_read(UC_X86_REG_ECX)),
+                                  expired=bullets.get(m.read32(sp + 4)),
+                                  control=bool(m.read32(sp + 8) & 255)))
+
+    hook = u.hook_add(UC_HOOK_CODE, observe_callback)
+    try:
+        if kind == 'enroll':
+            m.invoke(0x46B280, pointer)
+        elif kind == 'expire':
+            m.invoke(0x4684E0, receiver, (pointer, int(control)))
+        elif kind == 'uninit':
+            m.invoke(0x5F65F0, pointer)
+        elif kind == 'drain':
+            m.invoke(0x725C70, 0)
+        else:
+            raise ValueError(kind)
+        observation.returned(RET_MAGIC)
+        return dict(name=name, action=kind, bullet=bullets[pointer], control=control,
+                    bullet_type=m.string(m.read32(pointer + 0xAC) + 0x24) if kind != 'drain' else None,
+                    before=before, after=scalable_state(m, types, bullets),
+                    before_rng=before_rng, after_rng=rng_state(m), before_native_id=before_id,
+                    after_native_id=i32(u, m.read32(0xA8B230) + 0x214), counts=counts(m),
+                    calls=observation.calls.calls, callbacks=callbacks, transport=observation.transport)
+    finally:
+        u.hook_del(hook)
+        observation.close()
+
+
+def scalable_sole_retirement():
+    m, b, p, _cells, _inputs = prepare()
+    initialize_scalable_vector(m)
+    authored = {'Torpedo': dict(Image='SUBT', Scalable='yes')}
+    read = m.read_layer(p, authored)
+    bullets, types = {b: 1}, {'Torpedo': p}
+    return dict(authored_rules=authored, reader_admitted=read['admitted'],
+                rows=[scalable_action(m, name, kind, b, b, bullets, types)
+                      for name, kind in [('sole_enroll', 'enroll'), ('sole_uninit', 'uninit'), ('sole_drain', 'drain')]])
+
+
+def scalable_overflow_controls():
+    rows = []
+    for delay in (2147483647, -2147483648):
+        m, first, p, cells, _inputs = prepare(delay=delay)
+        initialize_scalable_vector(m)
+        authored = {'Torpedo': dict(Image='SUBT', Scalable='yes')}
+        read = m.read_layer(p, authored)
+        w = m.read32(first + 0x130)
+        states, bullets = [], {first: 1}
+        for identity in range(1, 9):
+            b = first
+            if identity != 1:
+                b, _ = construct_bullet(m, p, w, cells)
+                fire_bullet(m, b, (2688, 5248, 624))
+                bullets[b] = identity
+            m.invoke(0x46B280, b)
+            states.append(scalable_state(m, {'Torpedo': p}, bullets))
+        rows.append(dict(art_spawn_delay=str(delay), authored_rules=authored,
+                         reader_admitted=read['admitted'], states=states))
+    return rows
+
+
+def scalable_controls():
+    """Original list producer/removal, then the existing header/Anim owner."""
+    m, first, primary, cells, inputs = prepare()
+    initialize_scalable_vector(m)
+    u = m.u
+    # Authored final rules/ART pass over real Torpedo, through native readers.
+    authored_a = {'Torpedo': dict(Image='SUBT', Scalable='yes')}
+    read_a = m.read_layer(primary, authored_a)
+    art, _ = lexical((assets_root() / 'ARTMD.INI').read_bytes(), {'SUBT', 'BBBLELRG'})
+    art['SUBT']['SpawnDelay'] = '7'
+    m.make_ini(art)
+    secondary = m.construct('ScalableTrailerB')
+    authored_b = {'ScalableTrailerB': dict(Image='SUBT', Scalable='yes')}
+    read_b = m.read_layer(secondary, authored_b)
+    w = m.read32(first + 0x130)
+    types = {'Torpedo': primary, 'ScalableTrailerB': secondary}
+    bullets = {first: 1}
+    records = []
+
+    def state():
+        return scalable_state(m, types, bullets)
+
+    def action(name, kind, pointer, *, control=None):
+        records.append(scalable_action(m, name, kind, pointer, first, bullets, types, control=control))
+
+    sequence = [first]
+    for identity in range(1, 12):
+        p = secondary if identity in (9, 11) else primary
+        b = first
+        if identity != 1:
+            b, _ = construct_bullet(m, p, w, cells)
+            fire_bullet(m, b, (2688, 5248, 624))
+            bullets[b] = identity
+            sequence.append(b)
+        action('count_' + str(identity), 'enroll', b)
+        if identity in (7, 8, 11):
+            for frame in ((3, 4) if identity == 8 else (3,) if identity == 7 else (9,)):
+                header, _ = run_case('enrolled_header_' + str(identity) + '_frame_' + str(frame),
+                                     frame=frame, scaled=None, prepared=(m, b, p, cells, inputs))
+                records.append(dict(name=header['name'], action='header', bullet=identity,
+                                    before=state(), after=state(), header=header))
+    action('expire_false', 'expire', sequence[4], control=False)
+    action('expire_true', 'expire', sequence[4], control=True)
+    action('expire_repeat', 'expire', sequence[4], control=True)
+    # The original UnInit/Conceal broadcasts remove the last ordered member before its
+    # actual deferred destructor. This is independent of direct callback tests.
+    action('full_uninit', 'uninit', sequence[-1])
+    action('full_drain', 'drain', sequence[-1])
+    fresh, _ = construct_bullet(m, secondary, w, cells)
+    fire_bullet(m, fresh, (2688, 5248, 624))
+    bullets[fresh] = 12
+    action('reenroll_after_removal', 'enroll', fresh)
+
+    # One real retail Medusa type through every applicable selected rules layer.
+    medusa = m.construct('MedusaProjectile')
+    medusa_layers = []
+    fixed, _ = lexical((assets_root() / 'ARTMD.INI').read_bytes(), {'MEDUSA'})
+    m.make_ini(fixed)
+    for filename in LAYERS:
+        path = assets_root() / filename
+        if not path.exists():
+            continue
+        sections, _ = lexical(path.read_bytes(), {'MedusaProjectile'})
+        read = m.read_layer(medusa, sections)
+        medusa_layers.append(dict(file=filename, physical_keys=sections, admitted=read['admitted']))
+    types['MedusaProjectile'] = medusa
+    b, _ = construct_bullet(m, medusa, w, cells)
+    fire_bullet(m, b, (2688, 5248, 624))
+    bullets[b] = 13
+    action('stock_medusa_enroll', 'enroll', b)
+    header, _ = run_case('stock_medusa_null_trailer', frame=12, scaled=None,
+                         prepared=(m, b, medusa, cells, inputs))
+    records.append(dict(name=header['name'], action='header', bullet=13,
+                        before=state(), after=state(), header=header))
+    return dict(authored_rules=[authored_a, authored_b], authored_art=art,
+                authored_reader_admitted=[read_a['admitted'], read_b['admitted']],
+                medusa_layers=medusa_layers, rows=records,
+                sole_retirement=scalable_sole_retirement(),
+                overflow_controls=scalable_overflow_controls())
+
+
 def generate():
     rows = []
     cases = [(f'stock_frame_{frame}', dict(frame=frame)) for frame in range(-4, 8)]
@@ -482,7 +662,8 @@ def generate():
                 scenario_rng_seed=31, main_rng_seed=31, retail=retail,
                 seeded_rng_state_hex=seeded_struct(31).hex(),
                 retail_projectiles=retail_projectiles(),
-                placement_controls=placement_controls(), rows=rows)
+                placement_controls=placement_controls(), rows=rows,
+                scalable_controls=scalable_controls())
 
 
 def retail_projectiles():
@@ -530,7 +711,7 @@ def metadata():
         'The full original BulletType constructor and readers consume supplied physical lexical RULESMD, optional LANGRULE, MPBattleMD and Hills inputs; fixed ART reads consume SUBT and BBBLELRG. Hills.map is the unchanged inner INI entryD5FE80AC extracted from loose Hills.mmx, not the MMX container or XHills.MAP. Native physical archive/INI walking is outside this witness.',
         'The existing guided and impact fixture owners initialize selected original registries and flat level6 Cell objects. Each header Bullet executes full original Fire468670/Unlimbo before documented in-flight position/alive/wait/frame overrides; admission is retained in retail.admission. GameActive, empty receiver pools, target Cell and incoming Fire velocity are supplied boundaries. No SUB placement, upstream Techno FireAt, collision, rendering or complete startup pool identity is claimed.',
         'Header execution begins at4666E0 including ObjectAI and ends before flight4668BD, at the original dead/wait return, or the expired-wait explosion entry468D80. One continuation executes native Torpedo guidance through precommit467B7A with supplied incoming velocity and records its distinct candidate coordinate after the earlier Anim constructor. No native arithmetic result or branch outcome is calculated by Python. Explicit #DE controls accept only processor-exception faults at the two original IDIV instructions; all other execution failures abort publication.',
-        'Scaled controls execute original setter46C840 but supply its input; they do not establish the Scalable producer/list lifecycle. ART delay controls go through original readers. Main and Scenario RNG are independently seeded by original65C6D0 with seed31; original raw draw stores and both retained state hashes are recorded.',
+        'The original38 header rows remain unchanged: their scaled controls execute original setter46C840 with supplied input. The separate scalable_controls execute whole original46B280 with constructor/reader-backed types, ordered vector growth, direct PointerExpired controls and full UnInit/drain, including sole-member self callbacks. It explicitly executes vector initializer4662E0..466316, stopping BEFORE unsupported CRT atexit registration; not full CRT startup. Its two extreme ART base delays execute original readers and eight whole enrollments each to observe wrapping addition; they are authored arithmetic controls, not stock tuning. ART delay controls go through original readers. Main and Scenario RNG are independently seeded by original65C6D0 with seed31; original raw draw stores and both retained state hashes are recorded.',
         'Every admitted emission executes full Anim421EA0 including native identity, registration, Unlimbo and timer setup. Two histories remove the original Bullet through UnInit and deferred drain, then run the surviving independent AnimAI from the same frame through deferred retirement. The host supplies that schedule; the complete Logic loop, renderer and audio device are outside coverage.',
         'One authored RandomRate=450,225 ART control executes the original reader conversion before constructor RNG ordering and continuation; stock BBBLELRG retains its physical ART. Reader dependencies use unchanged shared default fixture setup rather than a separate world implementation.',
         'Original Bullet466380 plus AddRef46AFD0 establishes one host-held COM reference; original Configure4664C0 reads the physical weapon/type outputs. This does not execute upstream Unit FireAt or COM activation.',
@@ -543,6 +724,8 @@ def metadata():
         'scaled_idiv': 0x466844, 'anim_ctor': ANIM_CTOR, 'anim_ai': 0x423AC0,
         'anim_reader': 0x427D00, 'bullet_type_ctor': 0x46BBC0,
         'bullet_type_reader': 0x46BEE0, 'scaled_setter': 0x46C840,
+        'scalable_vector_init_prefix': 0x4662E0, 'scalable_vector_init_end': 0x466316,
+        'init_scalable': 0x46B280, 'bullet_pointer_expired': 0x4684E0,
         'bullet_type_fixup_coord': 0x46C4F0, 'bullet_fire': 0x468670,
         'object_unlimbo': 0x5F4EC0, 'set_location': 0x5F6940,
         'map_ground': 0x578080, 'proximity_setup': 0x4E1130,
@@ -552,9 +735,9 @@ def metadata():
     return result
 
 
-if __name__ == '__main__':
+def main(argv=None):
     root = Path(__file__).resolve().parents[2]
-    finish_vectors(generate, Path(__file__).with_suffix('.json'), provenance=metadata,
+    finish_vectors(generate, Path(__file__).with_suffix('.json'), provenance=metadata, argv=argv,
                    source_paths={name: root / name for name in (
                        'tools/projectile_oracle/projectile_trailer.py',
                        'tools/projectile_oracle/guided_step.py',
@@ -569,3 +752,7 @@ if __name__ == '__main__':
                        'tools/spatial_oracle/map_queries.py',
                        'tools/rmg_oracle/gen_rng_vectors.py',
                        'tools/native_oracle.py')})
+
+
+if __name__ == '__main__':
+    main()

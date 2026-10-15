@@ -362,7 +362,10 @@ impl Simulation {
                     .get(id)
                     .and_then(|projectile| projectile.payload.projectile_type())
                     .and_then(|type_id| rules.projectile(self.interner.resolve(type_id)))
-                    .and_then(|kind| head.trailer(kind, self.session.binary_frame));
+                    .and_then(|kind| {
+                        self.projectiles
+                            .trailer(&head, kind, self.session.binary_frame)
+                    });
                 if let Some((name, position)) = trailer {
                     self.spawn_named_anim(
                         rules,
@@ -476,7 +479,11 @@ impl Simulation {
                     .extend(result.detonations);
             }
             if terminal {
-                let retired = self.retire_non_entity_object(id);
+                let retired = self.retire_non_entity_object(
+                    id,
+                    super::UninitContext::new(rules, ctx.overlay_registry)
+                        .with_effects(ctx.effects),
+                );
                 debug_assert!(retired);
             }
             return outcome;
@@ -508,7 +515,11 @@ impl Simulation {
                 }
             }
             if !result.alive {
-                let retired = self.retire_non_entity_object(id);
+                let retired = self.retire_non_entity_object(
+                    id,
+                    super::UninitContext::new(rules, ctx.overlay_registry)
+                        .with_effects(ctx.effects),
+                );
                 debug_assert!(retired);
             }
             return outcome;

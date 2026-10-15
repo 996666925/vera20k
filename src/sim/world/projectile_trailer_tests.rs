@@ -1,6 +1,7 @@
 //! Original Bullet4666E0 trailer constructor and independent Anim lifetime.
-//! The native witness supplies an in-flight Bullet boundary; these fixtures do
-//! likewise. The release map profiles separately exercise actual SUB FireAt.
+//! Native witnesses supply an in-flight Bullet boundary for exact headers and
+//! Anim lifetimes. Scalable fixtures also exercise actual UnitTarget/Direct
+//! FireAt, shared expiry and load normalization. Release profiles cover SUB.
 
 use super::{Simulation, techno_ai::ObjectAiCtx};
 use crate::rules::{ini_parser::IniFile, ruleset::RuleSet};
@@ -200,6 +201,99 @@ fn only_bubble(sim: &Simulation) -> u64 {
     ids[0]
 }
 
+/// Authored Scalable+Trailer combination through the real Unit FireAt
+/// receiver. Original Unit741439 enrolls each returned Bullet; InitScalable
+/// 46B280 updates this retained type's cadence at the eighth live member.
+/// This is not a stock Medusa visual claim (its Trailer is null).
+fn scalable_unit_scene(shots: usize) -> Option<(Simulation, RuleSet, u64, u64)> {
+    let patch = IniFile::from_str("[Cannon]\nImage=SUBT\nScalable=yes\n");
+    let Some(fixture) =
+        crate::rules::retail_ini_fixture::retail_battle_rules_with_map_patch(&patch)
+    else {
+        return None;
+    };
+    let (_, assets) = crate::rules::retail_ini_fixture::retail_assets().unwrap();
+    let mut rules = fixture.rules;
+    assert_eq!(rules.object("MTNK").unwrap().primary(), Some("105mm"));
+    assert_eq!(
+        rules.weapon("105mm").unwrap().projectile.as_deref(),
+        Some("Cannon")
+    );
+    let kind = rules.projectile("Cannon").unwrap();
+    assert!(kind.scalable);
+    assert_eq!(kind.trailer.as_deref(), Some("BBBLELRG"));
+    assert_eq!(kind.spawn_delay, 3);
+    let roots = crate::rules::effect_asset_catalog::anim_class_roots(&rules);
+    rules.bind_anim_class_assets(&roots, &assets, "TEM", "TEMPERATE");
+
+    let mut sim = crate::sim::arena_fixture::rival_arena(&rules, 31);
+    let tank = sim
+        .spawn_object("MTNK", "Americans", 10, 20, 0, &rules)
+        .unwrap();
+    let target = sim
+        .spawn_object("MTNK", "Russians", 13, 20, 0, &rules)
+        .unwrap();
+    // Native70BCB0 aims through live TarCom independently of FireAt's
+    // explicit target. A direct mission call starts after this assignment.
+    sim.assign_target_represented(
+        tank,
+        Some(crate::sim::combat::TargetKind::Entity(target)),
+        Some(&rules),
+        None,
+        super::FrameEffects::default(),
+    )
+    .unwrap();
+    for _ in 0..shots {
+        let before = sim.projectiles.len();
+        sim.commit_fire_visit(
+            crate::sim::combat::world_fire::FireVisit::Direct {
+                id: tank,
+                target: crate::sim::combat::TargetKind::Entity(target),
+                weapon_index: 0,
+            },
+            &rules,
+            None,
+            super::FrameEffects::default(),
+        );
+        assert_eq!(
+            sim.projectiles.len(),
+            before + 1,
+            "each actual FireAt returned a Bullet"
+        );
+    }
+    assert!(
+        sim.substrate
+            .anims
+            .iter()
+            .all(|(_, anim)| { sim.interner.resolve(anim.type_id) != "BBBLELRG" })
+    );
+    Some((sim, rules, tank, target))
+}
+
+#[test]
+fn scalable_unit_shots_emit_a_real_trailer_on_the_shared_eighth_member_cadence() {
+    let Some((mut sim, rules, _, _)) = scalable_unit_scene(8) else {
+        return;
+    };
+    let ids: Vec<_> = sim.projectiles.iter().map(|(&id, _)| id).collect();
+    assert_eq!(sim.projectiles.scalable_members(), ids);
+    let kind = sim.interner.get("Cannon").unwrap();
+    assert_eq!(sim.projectiles.scaled_spawn_delay(kind), 4);
+    let (&bullet, projectile) = sim.projectiles.iter().next().unwrap();
+    let origin = projectile.position;
+    sim.session.binary_frame = 4;
+    sim.object_ai_visit_one_with_effects(bullet, Some(&rules), ObjectAiCtx::default());
+    let bubble = only_bubble(&sim);
+    let position = sim.anim(bubble).unwrap().world_coord;
+    assert_eq!(
+        [position.x, position.y, position.z],
+        [origin.x, origin.y, origin.z],
+        "the real Anim constructor receives pre-flight Location"
+    );
+    assert!(sim.substrate.logic.as_slice().contains(&bubble));
+    assert_ne!(sim.projectiles.get(bullet).unwrap().position, origin);
+}
+
 #[test]
 #[ignore = "slow; run when changing what it covers"]
 fn projectile_trailer_retail_constructor_rng_and_complete_lifetime_match_native() {
@@ -229,7 +323,7 @@ fn projectile_trailer_retail_constructor_rng_and_complete_lifetime_match_native(
         );
         assert!(sim.substrate.logic.as_slice().contains(&bubble));
 
-        assert!(sim.retire_non_entity_object(bullet));
+        assert!(sim.retire_non_entity_object(bullet, super::UninitContext::with_rules(&rules)));
         assert_eq!(counts(&sim), row["after_bullet_uninit"]["counts"]);
         assert_eq!(
             anim_state(&sim, sim.anim(bubble).unwrap()),
@@ -344,7 +438,7 @@ fn projectile_trailer_save_load_preserves_live_and_pending_cleanup_boundaries() 
     // Persist both live, then a Bullet already UnInit but not yet drained.
     for pending in [false, true] {
         if pending {
-            assert!(sim.retire_non_entity_object(bullet));
+            assert!(sim.retire_non_entity_object(bullet, super::UninitContext::with_rules(&rules)));
         }
         let mut first = restored(&sim);
         let mut second = restored(&sim);
@@ -370,7 +464,10 @@ fn projectile_trailer_save_load_preserves_live_and_pending_cleanup_boundaries() 
         // native-pinned independent animation history through its final drain.
         for loaded in [&mut first, &mut second] {
             if !pending {
-                assert!(loaded.retire_non_entity_object(bullet));
+                assert!(
+                    loaded
+                        .retire_non_entity_object(bullet, super::UninitContext::with_rules(&rules))
+                );
             }
             loaded.process_pending_delete_with(
                 Some(&rules),
@@ -406,4 +503,171 @@ fn projectile_trailer_save_load_preserves_live_and_pending_cleanup_boundaries() 
         }
         assert_eq!(counts(&first), row["final_counts"]);
     }
+}
+
+#[test]
+fn scalable_unit_target_and_direct_share_enrollment_but_failed_launch_does_not() {
+    let Some((mut sim, rules, tank, target)) = scalable_unit_scene(0) else {
+        return;
+    };
+    let source = sim.substrate.entities.get_mut(tank).unwrap();
+    source.body_facing.snap(0x4000, 0);
+    source.barrel_facing.as_mut().unwrap().snap(0x4000, 0);
+    sim.commit_fire_visit(
+        crate::sim::combat::world_fire::FireVisit::UnitTarget(tank),
+        &rules,
+        None,
+        super::FrameEffects::default(),
+    );
+    let ids: Vec<_> = sim.projectiles.iter().map(|(&id, _)| id).collect();
+    assert_eq!(
+        ids.len(),
+        1,
+        "the actual UnitTarget admission fires one shot"
+    );
+    assert_eq!(sim.projectiles.scalable_members(), ids);
+    //70BCB0's null TarCom aim is zero, independently of Direct's target;
+    // this exact supplied history previously demonstrated failed arc launch.
+    sim.assign_target_represented(
+        tank,
+        None,
+        Some(&rules),
+        None,
+        super::FrameEffects::default(),
+    )
+    .unwrap();
+    sim.commit_fire_visit(
+        crate::sim::combat::world_fire::FireVisit::Direct {
+            id: tank,
+            target: crate::sim::combat::TargetKind::Entity(target),
+            weapon_index: 0,
+        },
+        &rules,
+        None,
+        super::FrameEffects::default(),
+    );
+    assert_eq!(sim.projectiles.len(), 1);
+    assert_eq!(
+        sim.projectiles.scalable_members(),
+        ids,
+        "a null returned Bullet cannot enroll"
+    );
+}
+
+#[test]
+fn scalable_uninit_self_callback_removes_before_drain_and_keeps_type_override() {
+    let Some((mut sim, rules, _, _)) = scalable_unit_scene(1) else {
+        return;
+    };
+    let id = sim.projectiles.scalable_members()[0];
+    let type_id = sim
+        .projectiles
+        .get(id)
+        .unwrap()
+        .payload
+        .projectile_type()
+        .unwrap();
+    let corpus = native();
+    let rows = corpus["scalable_controls"]["sole_retirement"]["rows"]
+        .as_array()
+        .unwrap();
+    assert_eq!(
+        sim.projectiles.scaled_spawn_delay(type_id),
+        rows[0]["after"]["types"]["Torpedo"]["scaled_delay"]
+            .as_i64()
+            .unwrap() as i32
+    );
+    assert!(sim.retire_non_entity_object(id, super::UninitContext::with_rules(&rules)));
+    assert!(
+        sim.projectiles.get(id).is_some(),
+        "native UnInit keeps the expiring object represented"
+    );
+    assert_eq!(
+        sim.projectiles.scalable_members().len() as u64,
+        rows[1]["after"]["count"].as_u64().unwrap()
+    );
+    assert_eq!(sim.projectiles.scaled_spawn_delay(type_id), 3);
+    assert!(sim.substrate.pending_delete.contains_object(&id));
+    sim.process_pending_delete_with(Some(&rules), None, super::FrameEffects::default(), 1, false);
+    assert!(sim.projectiles.get(id).is_none());
+    assert_eq!(
+        sim.projectiles.scalable_members().len() as u64,
+        rows[2]["after"]["count"].as_u64().unwrap()
+    );
+    assert_eq!(
+        sim.projectiles.scaled_spawn_delay(type_id),
+        3,
+        "destructor does not reset type+2E8"
+    );
+}
+
+#[test]
+fn scalable_snapshot_mechanical_state_and_native_load_have_distinct_membership() {
+    let Some((mut sim, rules, _, _)) = scalable_unit_scene(8) else {
+        return;
+    };
+    let type_id = sim.interner.get("Cannon").unwrap();
+    let encoded = bincode::serialize(&sim.projectiles).unwrap();
+    let mechanical: crate::sim::projectile::ProjectileStore =
+        bincode::deserialize(&encoded).unwrap();
+    // in_logic_vector is an existing serde-skipped derived flag rebuilt by
+    // the world. Compare persisted state, not that deliberately absent flag.
+    assert_eq!(
+        mechanical.scalable_members(),
+        sim.projectiles.scalable_members()
+    );
+    assert_eq!(mechanical.scaled_spawn_delay(type_id), 4);
+    assert_eq!(bincode::serialize(&mechanical).unwrap(), encoded);
+    let mut loaded = restored(&sim);
+    assert!(
+        loaded.projectiles.scalable_members().is_empty(),
+        "normal native load does not rerun Unit741439"
+    );
+    assert_eq!(loaded.projectiles.scaled_spawn_delay(type_id), 4);
+    let mut control = restored(&sim);
+    assert_eq!(loaded.state_hash(), control.state_hash());
+    let members: Vec<_> = sim.projectiles.scalable_members().to_vec();
+    for id in members {
+        assert!(sim.retire_non_entity_object(id, super::UninitContext::with_rules(&rules)));
+    }
+    let mut no_members = restored(&sim);
+    assert!(no_members.projectiles.scalable_members().is_empty());
+    assert_eq!(no_members.projectiles.scaled_spawn_delay(type_id), 4);
+    let retained = no_members.projectiles.clone();
+    let retained_hash = no_members.state_hash();
+    let mut raw = serde_json::to_value(&no_members.projectiles).unwrap();
+    raw["scaled_spawn_delays"] = json!({});
+    no_members.projectiles = serde_json::from_value(raw).unwrap();
+    assert_ne!(
+        retained_hash,
+        no_members.state_hash(),
+        "retained type cadence is hashed even without members"
+    );
+    no_members.projectiles = retained;
+    assert_eq!(no_members.state_hash(), retained_hash);
+    // Loaded membership is empty but the old type cadence remains effective
+    // until another Unit shot overwrites it, through the same AI/Anim owner.
+    let bullet = *loaded.projectiles.iter().next().unwrap().0;
+    for world in [&mut loaded, &mut control] {
+        world.session.binary_frame = 4;
+        world.object_ai_visit_one_with_effects(bullet, Some(&rules), ObjectAiCtx::default());
+        only_bubble(world);
+    }
+    assert_eq!(loaded.state_hash(), control.state_hash());
+
+    let mut invalid = serde_json::to_value(&mechanical).unwrap();
+    invalid["scalable_members"] = json!([u64::MAX]);
+    let mut rejected = no_members;
+    rejected.projectiles = serde_json::from_value(invalid).unwrap();
+    assert!(matches!(
+        rejected.restore_after_snapshot_load(),
+        Err(crate::sim::snapshot::SnapshotRestoreError::InvalidScalableProjectileRuntime(_))
+    ));
+    let mut invalid = serde_json::to_value(&mechanical).unwrap();
+    invalid["scaled_spawn_delays"] = json!({"4294967295": 4});
+    rejected.projectiles = serde_json::from_value(invalid).unwrap();
+    assert!(matches!(
+        rejected.restore_after_snapshot_load(),
+        Err(crate::sim::snapshot::SnapshotRestoreError::InvalidScalableProjectileRuntime(_))
+    ));
 }

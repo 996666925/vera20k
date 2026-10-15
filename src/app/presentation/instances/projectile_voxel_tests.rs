@@ -131,7 +131,7 @@ fn admitted_stock_kirov_bomb_has_a_visible_voxel_body() {
                 }
             }
         }
-        assert!(sim.retire_non_entity_object(id));
+        assert!(sim.retire_non_entity_object(id, crate::sim::world::UninitContext::default()));
         let removed = NativeDisplayOrder::from_display(sim.display_layers());
         assert!(
             projectile_draw_instance(

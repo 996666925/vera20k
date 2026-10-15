@@ -1,4 +1,4 @@
-//! Native signed-frame producer controls. Scalable list ownership is separate.
+//! Native signed-frame producer and shared scalable-list controls.
 use super::*;
 use crate::rules::{ini_parser::IniFile, projectile_type::ProjectileType};
 use serde_json::{Value, json};
@@ -127,12 +127,9 @@ fn projectile_trailer_header_matches_original_signed_cadence_and_wait_gates() {
     let mut excluded = Vec::new();
     for row in corpus["rows"].as_array().unwrap() {
         let supplied = &row["supplied"];
-        // The store represents only admitted/live Bullets. Allocation failure
-        // and the unported Scalable global-list producer have no Rust receiver.
-        if supplied["alive"] == false
-            || supplied["allocation_failure"] == true
-            || supplied["scaled_delay"] != 0
-        {
+        // The store represents admitted/live Bullets; allocation failure and
+        // a supplied already-dead header have no Rust receiver.
+        if supplied["alive"] == false || supplied["allocation_failure"] == true {
             excluded.push(row["name"].as_str().unwrap());
             continue;
         }
@@ -156,6 +153,9 @@ fn projectile_trailer_header_matches_original_signed_cadence_and_wait_gates() {
         );
         let mut store = ProjectileStore::new();
         let mut spawn = super::tests::spawn(ProjectileTarget::Cell { rx: 16, ry: 20 });
+        let type_id = InternedId::from_index(1);
+        spawn.payload = ProjectilePayload::new(0, InternedId::from_index(2), Some(type_id), false);
+        store.set_scaled_spawn_delay(type_id, supplied["scaled_delay"].as_i64().unwrap() as i32);
         let p = &supplied["position"];
         spawn.origin = ProjectileCoord::new(
             p[0].as_i64().unwrap() as i32,
@@ -176,7 +176,7 @@ fn projectile_trailer_header_matches_original_signed_cadence_and_wait_gates() {
             row["name"]
         );
         let result = std::panic::catch_unwind(|| {
-            head.trailer(&kind, supplied["frame"].as_i64().unwrap() as u32)
+            store.trailer(&head, &kind, supplied["frame"].as_i64().unwrap() as u32)
         });
         if row.get("divide_fault").is_some() {
             assert!(
@@ -196,20 +196,251 @@ fn projectile_trailer_header_matches_original_signed_cadence_and_wait_gates() {
         }
         compared += 1;
     }
-    assert_eq!(
-        excluded,
-        [
-            "scaled_hit",
-            "scaled_overrides_base",
-            "scaled_negative",
-            "scaled_overrides_zero",
-            "scaled_overflow_trap",
-            "dead_before_divide",
-            "allocation_failure"
-        ]
-    );
+    assert_eq!(excluded, ["dead_before_divide", "allocation_failure"]);
     assert_eq!(
         compared,
         corpus["rows"].as_array().unwrap().len() - excluded.len()
     );
+}
+
+fn scalable_kind(name: &str, base: i32) -> ProjectileType {
+    let ini = IniFile::from_str(&format!("[{name}]\nImage=SUBT\nScalable=yes\n"));
+    let art = IniFile::from_str(&format!("[SUBT]\nTrailer=BBBLELRG\nSpawnDelay={base}\n"));
+    ProjectileType::from_ini_section(name, ini.section(name).unwrap(), art.section("SUBT"))
+}
+
+fn supplied_scalable_bullet(store: &mut ProjectileStore, id: u64, type_id: InternedId) {
+    let mut spawn = super::tests::spawn(ProjectileTarget::Cell { rx: 16, ry: 20 });
+    spawn.origin = ProjectileCoord::new(2688, 5248, 624);
+    spawn.payload = ProjectilePayload::new(0, InternedId::from_index(0), Some(type_id), false);
+    store.spawn(id, spawn);
+}
+
+/// Actual46B280/4684E0 vectors and full-header results. The fixture supplies
+/// constructed Bullets (not UnitFire) and explicit original callbacks; world
+/// tests separately exercise the producer and common broadcast transaction.
+#[test]
+fn scalable_members_type_cadence_and_callbacks_match_original() {
+    let corpus: Value = serde_json::from_str(crate::test_fixture::text(
+        "tools/projectile_oracle/projectile_trailer.json",
+    ))
+    .unwrap();
+    let controls = &corpus["scalable_controls"];
+    let Some(retail) = crate::rules::retail_ini_fixture::retail_battle_rules() else {
+        return;
+    };
+    let mut interner = crate::sim::intern::StringInterner::new();
+    // The original reads Torpedo against physical ART SpawnDelay3, then
+    // changes the authored ART to7 before constructing/reading the B type.
+    let kinds = [
+        scalable_kind("Torpedo", 3),
+        scalable_kind("ScalableTrailerB", 7),
+        retail.rules.projectile("MedusaProjectile").unwrap().clone(),
+    ];
+    let ids: BTreeMap<_, _> = kinds
+        .iter()
+        .map(|kind| (kind.id.as_str(), interner.intern(&kind.id)))
+        .collect();
+    let state = |store: &ProjectileStore, native: &Value| {
+        let types: serde_json::Map<_, _> = native["types"].as_object().unwrap().keys().map(|name| {
+            let kind = kinds.iter().find(|kind| &kind.id == name).unwrap();
+            (name.clone(), json!({"base_delay":kind.spawn_delay,"scaled_delay":store.scaled_spawn_delay(ids[name.as_str()]),
+                "scalable":kind.scalable,"trailer":kind.trailer}))
+        }).collect();
+        json!({"members":store.scalable_members(),"count":store.scalable_members().len(),"types":types})
+    };
+    for rows in [
+        controls["rows"].as_array().unwrap(),
+        controls["sole_retirement"]["rows"].as_array().unwrap(),
+    ] {
+        let mut store = ProjectileStore::new();
+        for row in rows {
+            let id = row["bullet"].as_u64().unwrap();
+            assert_eq!(
+                state(&store, &row["before"]),
+                row["before"],
+                "{} before",
+                row["name"]
+            );
+            match row["action"].as_str().unwrap() {
+                "enroll" => {
+                    let name = row["bullet_type"].as_str().unwrap();
+                    supplied_scalable_bullet(&mut store, id, ids[name]);
+                    let kind = kinds.iter().find(|kind| kind.id == name).unwrap();
+                    store.init_scalable(id, kind);
+                }
+                "expire" | "uninit" | "drain" => {
+                    for callback in row["callbacks"].as_array().unwrap() {
+                        assert!(
+                            store
+                                .pointer_expired(
+                                    callback["receiver"].as_u64().unwrap(),
+                                    callback["expired"].as_u64().unwrap(),
+                                    ProjectileTarget::None,
+                                    callback["control"].as_bool().unwrap()
+                                )
+                                .is_some()
+                        );
+                    }
+                    if row["action"] == "drain" {
+                        assert!(store.remove(id).is_some());
+                    }
+                }
+                "header" => {
+                    let header = &row["header"];
+                    let type_id = store.get(id).unwrap().payload.projectile_type().unwrap();
+                    let kind = kinds
+                        .iter()
+                        .find(|kind| ids[kind.id.as_str()] == type_id)
+                        .unwrap();
+                    let head = store.begin_ai_visit(id, |_| false).unwrap();
+                    let actual: Vec<_> = store
+                        .trailer(
+                            &head,
+                            kind,
+                            header["supplied"]["frame"].as_i64().unwrap() as u32,
+                        )
+                        .into_iter()
+                        .map(|(name, p)| json!({"anim_type":name,"position":[p.x,p.y,p.z]}))
+                        .collect();
+                    let expected: Vec<_> = header["emissions"].as_array().unwrap().iter()
+                        .map(|emission| json!({"anim_type":emission["anim_type"],"position":emission["position"]})).collect();
+                    assert_eq!(actual, expected, "{} header", row["name"]);
+                }
+                other => panic!("unhandled original operation {other}"),
+            }
+            assert_eq!(
+                state(&store, &row["after"]),
+                row["after"],
+                "{} after",
+                row["name"]
+            );
+            if row["action"] != "header" {
+                assert_eq!(
+                    row["before_rng"], row["after_rng"],
+                    "native list operations draw no RNG"
+                );
+                assert_eq!(
+                    row["before_native_id"], row["after_native_id"],
+                    "native list operations allocate no IDs"
+                );
+            }
+        }
+    }
+    for control in controls["overflow_controls"].as_array().unwrap() {
+        let first = &control["states"][0]["types"]["Torpedo"];
+        let kind = scalable_kind("Torpedo", first["base_delay"].as_i64().unwrap() as i32);
+        let mut store = ProjectileStore::new();
+        for (index, native) in control["states"].as_array().unwrap().iter().enumerate() {
+            let id = index as u64 + 1;
+            supplied_scalable_bullet(&mut store, id, ids["Torpedo"]);
+            store.init_scalable(id, &kind);
+            assert_eq!(
+                store.scalable_members(),
+                native["members"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_u64().unwrap())
+                    .collect::<Vec<_>>()
+            );
+            assert_eq!(
+                store.scaled_spawn_delay(ids["Torpedo"]),
+                native["types"]["Torpedo"]["scaled_delay"].as_i64().unwrap() as i32
+            );
+        }
+    }
+}
+
+#[test]
+fn scalable_expiry_removes_one_duplicate_per_present_bullet_callback() {
+    let kind = scalable_kind("Torpedo", 3);
+    let type_id = InternedId::from_index(1);
+    let mut store = ProjectileStore::new();
+    supplied_scalable_bullet(&mut store, 1, type_id);
+    supplied_scalable_bullet(&mut store, 2, type_id);
+    assert!(
+        store.scalable_members().is_empty(),
+        "generic construction does not enroll"
+    );
+    for _ in 0..3 {
+        store.init_scalable(1, &kind);
+    }
+    assert_eq!(store.scalable_members(), [1, 1, 1]);
+    assert_eq!(
+        store.pointer_expired(999, 1, ProjectileTarget::None, true),
+        None
+    );
+    assert_eq!(
+        store.scalable_members(),
+        [1, 1, 1],
+        "no subscriber means no callback"
+    );
+    assert_eq!(
+        store.pointer_expired(1, 1, ProjectileTarget::None, false),
+        Some(false)
+    );
+    assert_eq!(store.scalable_members(), [1, 1, 1]);
+    assert_eq!(
+        store.pointer_expired(1, 1, ProjectileTarget::None, true),
+        Some(true)
+    );
+    assert_eq!(store.scalable_members(), [1, 1]);
+    assert_eq!(
+        store.pointer_expired(2, 1, ProjectileTarget::None, true),
+        Some(true)
+    );
+    assert_eq!(store.scalable_members(), [1]);
+    assert_eq!(
+        store.scaled_spawn_delay(type_id),
+        3,
+        "expiry does not recompute type cadence"
+    );
+    let mut no_longer_scalable = kind.clone();
+    no_longer_scalable.scalable = false;
+    let head = store.begin_ai_visit(1, |_| false).unwrap();
+    assert!(
+        store.trailer(&head, &no_longer_scalable, 3).is_some(),
+        "header reads retained override without a Scalable flag gate"
+    );
+}
+
+/// A receipt after the last match permits the remaining native subscribers
+/// to repair their own refs without repeating a known-missing vector search.
+/// This checks the permission's semantics, not elapsed time or search internals.
+#[test]
+fn scalable_expiry_last_match_receipt_keeps_later_subscriber_repairs() {
+    let kind = scalable_kind("Torpedo", 3);
+    let type_id = InternedId::from_index(1);
+    let mut store = ProjectileStore::new();
+    supplied_scalable_bullet(&mut store, 1, type_id);
+    store.init_scalable(1, &kind);
+    for id in 2..=64 {
+        supplied_scalable_bullet(&mut store, id, type_id);
+        let bullet = store.get_mut(id).unwrap();
+        bullet.source_id = 1;
+        bullet.target = ProjectileTarget::Entity(1);
+    }
+    let mut pending = true;
+    for receiver in 1..=64 {
+        pending = store
+            .pointer_expired(
+                receiver,
+                1,
+                ProjectileTarget::Cell { rx: 10, ry: 20 },
+                pending,
+            )
+            .unwrap();
+        assert!(
+            !pending,
+            "the sole match was removed at the first actual subscriber"
+        );
+        if receiver != 1 {
+            let bullet = store.get(receiver).unwrap();
+            assert_eq!(bullet.source_id, crate::sim::combat::RAD_NO_ATTACKER);
+            assert_eq!(bullet.target, ProjectileTarget::Cell { rx: 10, ry: 20 });
+        }
+    }
+    assert!(store.scalable_members().is_empty());
+    assert_eq!(store.scaled_spawn_delay(type_id), 3);
 }
