@@ -262,7 +262,7 @@ impl PendingCameraScroll {
         let requests = std::mem::take(&mut self.world_pixels);
         if (requests.0 + mouse.0, requests.1 + mouse.1) == (0.0, 0.0) {
             //6D26F9 skips the clamp when requested and committed views match.
-            // This also preserves native low/high behavior on a small map.
+            // Idle requests leave the committed view untouched.
             return current;
         }
         clamp((
@@ -1884,7 +1884,8 @@ fn clamp_camera_point_to_local_bounds(
     // bounds to VERA world top-left using the shared projection's row bias;
     // the viewport/2 terms cancel. Retain x86 wrapping integer arithmetic
     // before presentation conversion. Executed controls include all edges,
-    // shifted LocalSize and a viewport larger than the map: fast_scroll.json.
+    // shifted LocalSize: fast_scroll.json. Oversized views deliberately use
+    // VERA's stable centering policy below instead of native alternating bounds.
     let bias = crate::util::lepton::absolute_leptons_to_screen(0, 0, 0);
     let left = bounds
         .off_fc
@@ -1926,20 +1927,25 @@ fn clamp_camera_point_to_rect(
     let y_max = y_min + area_h - visible_h;
 
     // Native comparison order is Y low/high, then X low/high. Each side is a
-    // strict comparison, so an exact boundary remains untouched. Do not invent
-    // a centred fallback when a custom map is smaller than the viewport.
-    let mut x = point.0;
-    let mut y = point.1;
-    if y < y_min {
-        y = y_min;
-    } else if y > y_max {
-        y = y_max;
-    }
-    if x < x_min {
-        x = x_min;
-    } else if x > x_max {
-        x = x_max;
-    }
+    // strict comparison, so an exact boundary remains untouched. When a map
+    // is smaller than the tactical viewport, the native low/high pair is
+    // inverted and alternates on every presentation frame (native control:
+    // fast_scroll.json/focus_view_larger_than_local_rect). For large viewports
+    // and VERA's presentation-only zoom, center that axis instead; repeated
+    // clamps must leave the committed view unchanged.
+    let clamp_axis = |value: f32, low: f32, high: f32, extent: f32, visible: f32| {
+        if extent <= visible {
+            low + (extent - visible) / 2.0
+        } else if value < low {
+            low
+        } else if value > high {
+            high
+        } else {
+            value
+        }
+    };
+    let x = clamp_axis(point.0, x_min, x_max, area_w, visible_w);
+    let y = clamp_axis(point.1, y_min, y_max, area_h, visible_h);
     (x, y)
 }
 
@@ -2957,3 +2963,7 @@ mod tests {
 #[cfg(test)]
 #[path = "fast_scroll_tests.rs"]
 mod fast_scroll_tests;
+
+#[cfg(test)]
+#[path = "camera_bounds_tests.rs"]
+mod camera_bounds_tests;
