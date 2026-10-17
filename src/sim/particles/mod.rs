@@ -54,6 +54,8 @@ pub struct ParticleSystem {
     pub type_id: ParticleSystemTypeId,
     #[serde(with = "ivec3_serde")]
     pub coords: IVec3,
+    /// Constructor62DE6D: Location minus owner GetCoords, in world leptons.
+    /// Smoke AI adds this unchanged displacement to moving owners' GetCoords.
     #[serde(with = "ivec3_serde")]
     pub offset: IVec3,
     pub particles: Vec<Particle>,

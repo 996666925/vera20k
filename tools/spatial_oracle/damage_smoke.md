@@ -11,6 +11,29 @@ The JSON contains original-produced results; its sidecar records the selected
 executable hash and command. Default execution checks; `--write` deliberately
 creates or replaces a reference.
 
+Unit following has a separate small corpus consumed by
+`smoke_native_tests::original_smoke_follows_owner_offset_leaves_trail_and_suppresses_tube_births`:
+
+```sh
+python -m tools.spatial_oracle.damage_smoke --following --check
+```
+
+This executes the original system constructor and complete system AI with
+Unit, Infantry, Aircraft and Building vtables. The fixture supplies an Object
+constructor, concrete flags, alive byte, raw owner coordinates and tube byte;
+it does not establish complete Foot construction or movement. Constructor
+`62DE6D..62DEAF` stores system Location minus owner GetCoords in `+B0..B8`.
+Smoke `62ED49..62EDB5` updates that Location before visiting any particle when
+the owner has Techno flag2 and IPersistStream WhatAmI is not Building6.
+Existing particles retain their own world coordinates and move independently.
+`62F080..62F098` suppresses births for Foot flag4 with signed tube byte
+`+684 >= 0`, before the two offset RNG draws; the accumulator and lifetime
+still advance. Done systems still follow and update their existing smoke.
+The controls compare stored offsets, system and particle coordinates, timers,
+births and Scenario RNG. There are no additional following RNG draws or
+timer/detach writes; ordinary retirement retains the existing owner. No draw
+pixels, side-by-side play or whole-match parity is established here.
+
 The selected physical types are SmallGreySSys/BigGreySmokeSys and
 SmallGreySmoke/LargeGreySmoke. Original constructors and readers determine
 their scalar defaults and fields across the existing physical RULESMD,

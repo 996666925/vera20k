@@ -187,13 +187,30 @@ impl Simulation {
         // Executed constructor/CRC: procedural_drawing_oracle/electric_bolt.
         let native_unique_id = self.next_native_runtime_id();
         let stable_id = self.allocate_stable_id();
+        // Constructor62DE6D..62DEAF: retain Location - owner GetCoords,
+        // not the current type's DamageSmokeOffset. Smoke62ED49 consumes
+        // this stored world-lepton displacement; other behaviors retain it.
+        // Source/control: tools/spatial_oracle/damage_smoke.md (--following).
+        let offset = owner_entity
+            .and_then(|id| self.substrate.entities.get(id))
+            .map_or(IVec3::ZERO, |owner| {
+                let origin = crate::sim::movement::ground_pose::object_get_coords(
+                    owner,
+                    self.resolved_terrain.as_ref(),
+                );
+                IVec3::new(
+                    coords.x.wrapping_sub(origin.x),
+                    coords.y.wrapping_sub(origin.y),
+                    coords.z.wrapping_sub(origin.z),
+                )
+            });
         let sys = ParticleSystem {
             stable_id,
             native_unique_id,
             in_logic_vector: false,
             type_id,
             coords,
-            offset: IVec3::ZERO,
+            offset,
             particles: Vec::new(),
             spawn_timer: X87Chop53::store_f32(X87Chop53::load_i32(pst.spawn_frames))
                 .expect("signed SpawnFrames fits stored binary32"),

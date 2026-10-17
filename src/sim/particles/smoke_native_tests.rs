@@ -212,22 +212,40 @@ fn install_system(
         let stable = sim.allocate_stable_id();
         let house = sim.interner.intern("Neutral");
         let ty = sim.interner.intern("FixtureBuilding");
-        sim.substrate
-            .entities
-            .insert(GameEntity::new_at_frame_zero_for_test(
-                stable,
-                44,
-                48,
-                0,
-                0,
-                house,
-                Health::new(255),
-                ty,
-                EntityCategory::Structure,
-                0,
-                0,
-                false,
-            ));
+        let category = match input["owner_kind"].as_str().unwrap_or("building") {
+            "unit" => EntityCategory::Unit,
+            "infantry" => EntityCategory::Infantry,
+            "aircraft" => EntityCategory::Aircraft,
+            _ => EntityCategory::Structure,
+        };
+        let mut entity = GameEntity::new_at_frame_zero_for_test(
+            stable,
+            44,
+            48,
+            0,
+            0,
+            house,
+            Health::new(255),
+            ty,
+            category,
+            0,
+            0,
+            false,
+        );
+        if !input["owner_coords"].is_null() {
+            let c = coords(&input["owner_coords"]);
+            entity
+                .position
+                .put_location(crate::sim::components::DriveCoord {
+                    x: c.x,
+                    y: c.y,
+                    z: c.z,
+                });
+            if category == EntityCategory::Structure {
+                entity.type_facts.set_foundation_for_test("2x2".into());
+            }
+        }
+        sim.substrate.entities.insert(entity);
         Some(stable)
     } else {
         None
@@ -270,8 +288,84 @@ fn install_system(
             .unwrap()
             .damage_smoke_system_id
             .set_for_test(Some(id));
+        if !input["moved_owner_coords"].is_null() {
+            let c = coords(&input["moved_owner_coords"]);
+            sim.substrate
+                .entities
+                .get_mut(owner)
+                .unwrap()
+                .position
+                .put_location(crate::sim::components::DriveCoord {
+                    x: c.x,
+                    y: c.y,
+                    z: c.z,
+                });
+        }
     }
     (id, owner)
+}
+
+#[test]
+fn original_smoke_follows_owner_offset_leaves_trail_and_suppresses_tube_births() {
+    let data = corpus();
+    let following = crate::test_fixture::json("tools/spatial_oracle/damage_smoke_following.json");
+    for case in following["cases"].as_array().unwrap() {
+        let mut input = case["input"].clone();
+        input["owner"] = Value::Bool(true);
+        let rules = rules(&data, &input);
+        let mut sim = sim(false);
+        let (id, owner) = install_system(&mut sim, &rules, &input, &case["before"]);
+        let owner = owner.unwrap();
+        assert_eq!(
+            sim.particle_systems().get(id).unwrap().offset,
+            coords(&case["before"]["offset"]),
+            "{} constructor offset",
+            input["name"]
+        );
+        adopt_rng(&mut sim, case);
+        for (step, expected) in input["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(case["visits"].as_array().unwrap())
+        {
+            let entity = sim.substrate.entities.get_mut(owner).unwrap();
+            let c = coords(&step["coords"]);
+            entity
+                .position
+                .put_location(crate::sim::components::DriveCoord {
+                    x: c.x,
+                    y: c.y,
+                    z: c.z,
+                });
+            entity.low_bridge_tube_state = (step["tube"] == true).then(|| {
+                crate::sim::movement::tube_movement::LowBridgeTubeMovementState::for_test(
+                    crate::map::tube_facts::TubeId(0),
+                    0,
+                    crate::sim::components::DriveCoord {
+                        x: c.x,
+                        y: c.y,
+                        z: c.z,
+                    },
+                )
+            });
+            sim.session.binary_frame = 0;
+            assert!(super::super::system_ai::tick_particle_system(
+                &mut sim, &rules, id
+            ));
+            assert_system(&sim, id, Some(owner), expected);
+            assert_eq!(
+                sim.particle_systems().get(id).unwrap().offset,
+                coords(&expected["offset"])
+            );
+        }
+        assert_eq!(
+            sim.scenario_rng.native_state_hex(),
+            case["scenario_after"].as_str().unwrap(),
+            "{} RNG",
+            input["name"]
+        );
+    }
 }
 fn assert_system(sim: &Simulation, id: u64, owner: Option<u64>, expected: &Value) {
     let sys = sim.particle_systems().get(id).unwrap();
@@ -376,12 +470,27 @@ fn original_stored_smoke_accumulator_preserves_long_run_rng_boundaries() {
 #[test]
 fn smoke_scalar_and_air_authorities_survive_existing_snapshot_roundtrip() {
     let data = corpus();
-    let case = &data["system_ticks"][0];
-    let rules = rules(&data, &case["input"]);
+    let following = crate::test_fixture::json("tools/spatial_oracle/damage_smoke_following.json");
+    let case = &following["cases"][0];
+    let mut input = case["input"].clone();
+    input["owner"] = Value::Bool(true);
+    let rules = rules(&data, &input);
     let mut sim = sim(false);
-    let (id, owner) = install_system(&mut sim, &rules, &case["input"], &case["before"]);
+    let (id, owner) = install_system(&mut sim, &rules, &input, &case["before"]);
     adopt_rng(&mut sim, case);
-    sim.session.binary_frame = 40;
+    let owner_id = owner.unwrap();
+    let c = coords(&input["steps"][0]["coords"]);
+    sim.substrate
+        .entities
+        .get_mut(owner_id)
+        .unwrap()
+        .position
+        .put_location(crate::sim::components::DriveCoord {
+            x: c.x,
+            y: c.y,
+            z: c.z,
+        });
+    sim.session.binary_frame = 0;
     super::super::system_ai::tick_particle_system(&mut sim, &rules, id);
     sim.session.map_name = "damage-smoke-continuation".into();
     let bytes = GameSnapshot::save_validated(&sim, 17, 23, "Smoke continuation", 0);
@@ -389,15 +498,32 @@ fn smoke_scalar_and_air_authorities_survive_existing_snapshot_roundtrip() {
         .unwrap()
         .sim;
     restored.restore_after_snapshot_load().unwrap();
-    assert_system(&restored, id, owner, &case["visits"][0]["state"]);
+    assert_system(&restored, id, owner, &case["visits"][0]);
+    assert_eq!(
+        restored.particle_systems().get(id).unwrap().offset,
+        coords(&case["before"]["offset"])
+    );
     // Existing load deliberately reseeds Scenario; this check changes no load
     // flow. Adopt the same tested continuation boundary for the gameplay owner.
     restored.scenario_rng =
         SimRng::from_native_state_hex_for_test(&sim.scenario_rng.native_state_hex());
-    sim.session.binary_frame = 41;
-    restored.session.binary_frame = 41;
+    let c = coords(&input["steps"][1]["coords"]);
+    for world in [&mut sim, &mut restored] {
+        world
+            .substrate
+            .entities
+            .get_mut(owner_id)
+            .unwrap()
+            .position
+            .put_location(crate::sim::components::DriveCoord {
+                x: c.x,
+                y: c.y,
+                z: c.z,
+            });
+    }
     super::super::system_ai::tick_particle_system(&mut sim, &rules, id);
     super::super::system_ai::tick_particle_system(&mut restored, &rules, id);
+    assert_system(&restored, id, owner, &case["visits"][1]);
     let a = sim.particle_systems().get(id).unwrap();
     let b = restored.particle_systems().get(id).unwrap();
     assert_eq!(a.spawn_timer(), b.spawn_timer());

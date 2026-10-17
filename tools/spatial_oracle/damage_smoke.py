@@ -9,6 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 import hashlib
 import struct
+import sys
 
 from unicorn.x86_const import UC_X86_REG_EDI, UC_X86_REG_ESI, UC_X86_REG_ESP
 
@@ -197,8 +198,26 @@ class DamageSmoke(SparkBirth):
         self.owner = p
         return p
 
-    def system(self, name='SmallGreySSys', coords=ORIGIN, *, owner=False):
-        owner_pointer = self.building_owner(coords) if owner else 0
+    def foot_owner(self, kind, coords):
+        # Bounded prior state: original Object constructor, concrete class vtable,
+        # Techno/Foot flags, raw Location, alive byte and no active tube. The
+        # inherited IPersistStream thunk dispatches the concrete What_Am_I.
+        p = self.alloc(0x800)
+        self.invoke(0x5F3900, p)
+        self.u.mem_write(p, words(dict(unit=0x7F5C70, infantry=0x7EB058,
+                                      aircraft=0x7E22A4)[kind]))
+        self.u.mem_write(p + 0x14, words(7))
+        self.u.mem_write(p + 0x9C, words(*coords))
+        self.u.mem_write(p + 0x90, b'\1')
+        self.u.mem_write(p + 0x684, b'\xff')
+        self.owner = p
+        return p
+
+    def system(self, name='SmallGreySSys', coords=ORIGIN, *, owner=False,
+               owner_kind='building', owner_coords=None):
+        owner_coords = coords if owner_coords is None else owner_coords
+        owner_pointer = (self.building_owner(owner_coords) if owner_kind == 'building'
+                         else self.foot_owner(owner_kind, owner_coords)) if owner else 0
         pointer, location, target = self.alloc(0x100), self.alloc(12), self.alloc(12)
         self.u.mem_write(location, words(*coords))
         self.invoke(0x62DC50, pointer, (self.types[name], location, 0, owner_pointer, target, 0))
@@ -409,6 +428,47 @@ def generate():
         movement=[movement(case) for case in moves], accumulator_walk=accumulator_walk())
 
 
+def following():
+    # Small controls through the actual constructor and complete System AI.
+    # Only owner Location/tube and frame are supplied between visits; no native
+    # body, RNG result, timer or coordinate getter is replaced.
+    controls = [dict(name=kind + '_offset_and_trail', owner_kind=kind,
+                     steps=[dict(coords=[ORIGIN[0] + 256, ORIGIN[1] - 128, 150]),
+                            dict(coords=[ORIGIN[0] + 512, ORIGIN[1], 230])])
+                for kind in ('unit', 'infantry', 'aircraft', 'building')]
+    controls += [dict(name='tube_suppression_then_resume', owner_kind='unit',
+                      steps=[dict(coords=[ORIGIN[0] + 256, ORIGIN[1], 20], tube=True),
+                             dict(coords=[ORIGIN[0] + 512, ORIGIN[1], 30], tube=False)]),
+                 dict(name='done_system_still_follows_and_moves_old_smoke', owner_kind='unit',
+                      done=True, steps=[dict(coords=[ORIGIN[0] + 256, ORIGIN[1], 60])])]
+    rows = []
+    for case in controls:
+        m = DamageSmoke(case)
+        origin = [ORIGIN[0] + 13, ORIGIN[1] - 27, 124]
+        initial_owner = [ORIGIN[0], ORIGIN[1], 83]
+        system = m.system(coords=origin, owner=True, owner_kind=case['owner_kind'],
+                          owner_coords=initial_owner)
+        m.particle(system, coords=[ORIGIN[0], ORIGIN[1], 90])
+        if case.get('done'):
+            m.invoke(0x6301E0, system)
+        def state():
+            return dict(m.system_state(system), offset=ints(m.u, system + 0xB0, 3))
+        before = state()
+        m.begin([5, 7, 0, 0, 9, 11, 1, 5])
+        visits = []
+        for step in case['steps']:
+            m.u.mem_write(m.owner + 0x9C, words(*step['coords']))
+            if case['owner_kind'] != 'building':
+                m.u.mem_write(m.owner + 0x684, b'\0' if step.get('tube') else b'\xff')
+            # Frame 0 admits emission regardless of the accumulator's divisor.
+            m.u.mem_write(FRAME, words(0))
+            m.invoke(0x62FD60, system)
+            visits.append(state())
+        rows.append(dict(input=dict(case, owner_coords=initial_owner),
+                         before=before, visits=visits, **m.result()))
+    return dict(cases=rows)
+
+
 def metadata():
     return native.provenance(
         scope='Original Smoke constructors, Particle dispatch and AI, reverse SmokeSystem children/spawn, movement and bounded float accumulator; supplied ordinary Building coordinate receiver and prior state.',
@@ -432,4 +492,17 @@ def metadata():
 
 
 if __name__ == '__main__':
-    native.finish_vectors(generate, Path(__file__).with_suffix('.json'), provenance=metadata)
+    if '--following' in sys.argv:
+        native.finish_vectors(following, Path(__file__).with_name('damage_smoke_following.json'),
+            argv=[arg for arg in sys.argv[1:] if arg != '--following'],
+            provenance=lambda: native.provenance(
+                scope='Original Smoke system constructor offset and complete AI following, trail and tube suppression.',
+                assumptions=[
+                    'Existing DamageSmoke/SparkBirth runtime, physical retail particle readers and original RNG bodies.',
+                    'Bounded Object construction with actual Unit, Infantry, Aircraft or Building vtables; supplied raw coordinates, flags, alive and tube prior state. No whole Foot constructor or movement/receive-damage proof.',
+                    'Existing smoke remains alive; supplied frame zero admits emission. Owner location and tube state change between visits. No renderer, save/load or whole-match execution.',
+                ], substitutions=['Only inherited OS/archive/INI transport; no smoke, getter, RNG, timer or detach result substitution.'],
+                entry_points=dict(constructor=0x62DC50, system_ai=0x62FD60, smoke_ai=0x62ED40,
+                                  offset=0x62DE6D, follow=0x62ED49, tube_gate=0x62F080)))
+    else:
+        native.finish_vectors(generate, Path(__file__).with_suffix('.json'), provenance=metadata)

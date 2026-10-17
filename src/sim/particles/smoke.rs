@@ -1,12 +1,12 @@
-//! Ordinary stationary Smoke, from ParticleSystemAI62ED40, ParticleAI62C540
+//! Ordinary Smoke, from ParticleSystemAI62ED40, ParticleAI62C540
 //! and MoveSmoke62D3F0. Original evidence/control corpus:
 //! tools/spatial_oracle/damage_smoke.{md,json}.
 //!
 //! The Particle owner retains raw float stores: the spawn accumulator changes
 //! future emission/RNG frames, and speed stores change integer rise. Native
 //! 53-bit/chop operations use the existing numeric owner, never host FP state.
-//! RESIDUAL: Foot-owner following/suppression is a separate held movement
-//! chain. This route covers ownerless systems and stationary Building owners.
+//! Moving Techno owners retain the constructor's world offset; buildings stay
+//! stationary. Foot owners in tubes suppress births, not existing particles.
 
 use super::wind::{SMOKE_WIND_DX, SMOKE_WIND_DY};
 use super::{Particle, ParticleSystem};
@@ -19,6 +19,26 @@ use glam::IVec3;
 
 pub(super) fn tick_system(sys: &mut ParticleSystem, sim: &mut Simulation, rules: &RuleSet) {
     let pst = rules.particle_system_type(sys.type_id);
+    //62ED49..62EDB5: Techno flag2, excluding Building WhatAmI6. This is
+    //before child AI even when done spawning. GetCoords has one shared owner;
+    //the offset is retained in world axes, so turning does not rotate it.
+    //Source/control: tools/spatial_oracle/damage_smoke.md (--following).
+    if let Some(owner) = sys
+        .owner_entity
+        .and_then(|id| sim.substrate.entities.get(id))
+        && owner.category().is_foot()
+    {
+        let origin = crate::sim::movement::ground_pose::object_get_coords(
+            owner,
+            sim.resolved_terrain.as_ref(),
+        );
+        sys.coords = offset_coords(
+            IVec3::new(origin.x, origin.y, origin.z),
+            sys.offset.x,
+            sys.offset.y,
+            sys.offset.z,
+        );
+    }
     //62EDD0: every original child AI forward, even one already marked dead.
     for p in &mut sys.particles {
         super::system_ai::tick_particle(p, sim, rules);
@@ -74,6 +94,15 @@ pub(super) fn tick_system(sys: &mut ParticleSystem, sim: &mut Simulation, rules:
             .checked_rem(divisor)
             .expect("native Smoke spawning requires valid IDIV")
             == 0
+            //62F080..62F098: Foot flag4 with signed tube byte+684 >= 0
+            //skips emission BEFORE its offset/constructor RNG draws. Existing
+            //particles, spawn accumulator and system lifetime still advance.
+            && !sys
+                .owner_entity
+                .and_then(|id| sim.substrate.entities.get(id))
+                .is_some_and(|owner| {
+                    owner.category().is_foot() && owner.low_bridge_tube_state.is_some()
+                })
         {
             let radius = pst.spawn_radius.wrapping_add(1);
             assert_ne!(radius, 0, "native Smoke spawning divides by SpawnRadius+1");

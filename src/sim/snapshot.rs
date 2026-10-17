@@ -1076,7 +1076,10 @@ use crate::sim::world::Simulation;
 // 385 -> 386: retained Building primary flags are sets per owner/category.
 // Manual448160 preserves limbo peers and queued events can toggle them later.
 // 386 -> 387: combine retained Weapon, Drive and Building primary layouts.
-const SNAPSHOT_VERSION: u32 = 387;
+// 387 -> 388: particle-system offsets retain constructor-relative coordinates.
+// Older saves stored zero even for an offset smoke source; resuming their new
+// follow behavior would snap it to the owner, so reject that continuation.
+const SNAPSHOT_VERSION: u32 = 388;
 
 const SNAPSHOT_PRODUCT_MAGIC: [u8; 8] = *b"VERA20K\0";
 const SNAPSHOT_ENVELOPE_VERSION: u32 = 1;
@@ -4614,7 +4617,8 @@ mod tests {
         // 385 -> 386: combined Weapon and Drive layouts.
         // 385 -> 386: retained primary flags include matching limbo peers.
         // 386 -> 387: combined Weapon, Drive and Building primary layouts.
-        assert_eq!(super::SNAPSHOT_VERSION, 387);
+        // 387 -> 388: particle owner-relative offsets have native semantics.
+        assert_eq!(super::SNAPSHOT_VERSION, 388);
     }
 
     #[test]

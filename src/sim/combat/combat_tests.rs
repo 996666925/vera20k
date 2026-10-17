@@ -3553,7 +3553,7 @@ fn gsi_04_07_damage_receiver_smoke_creation_precedes_retaliation() {
          [HitWH]\nCellSpread=0\nVerses=100%,100%,100%,100%,100%,100%,100%,100%,100%,100%,100%\n\
          [ReturnWH]\nCellSpread=0\nVerses=100%,100%,100%,100%,100%,100%,100%,100%,100%,100%,100%\n\
          [SparkSys]\nBehavesLike=Spark\nLifetime=5\n\
-         [SmallGreySSys]\nBehavesLike=Smoke\nLifetime=-1\nSpawns=no\n\
+         [SmallGreySSys]\nBehavesLike=Smoke\nLifetime=-1\nSpawns=no\nSpawnFrames=10\nSpawnCutoff=13\n\
          [AudioVisual]\nConditionYellow=50%\nConditionRed=25%\n",
     ))
     .expect("damage-Smoke receiver fixture");
@@ -3626,6 +3626,29 @@ fn gsi_04_07_damage_receiver_smoke_creation_precedes_retaliation() {
         before_rng,
         "reverse filtering leaves one Smoke choice, so RandomRanged(0,0) draws nothing"
     );
+    // The actual ReceiveDamage-created +310 system follows the same retained
+    // owner as the native constructor/AI controls in damage_smoke_following.
+    // Frame1 is not an emission frame; moving the source consumes no RNG.
+    let moved = crate::sim::components::DriveCoord {
+        x: 9 * 256 + 37,
+        y: 6 * 256 + 91,
+        z: 74,
+    };
+    sim.substrate
+        .entities
+        .get_mut(victim_id)
+        .unwrap()
+        .position
+        .put_location(moved);
+    sim.session.binary_frame = 1;
+    assert!(crate::sim::particles::system_ai::tick_particle_system(
+        &mut sim, &rules, system_id
+    ));
+    assert_eq!(
+        sim.particle_systems().get(system_id).unwrap().coords,
+        glam::IVec3::new(moved.x, moved.y, moved.z)
+    );
+    assert_eq!(sim.scenario_rng.logical_state(), before_rng);
 
     sim.commit_noncombat_aoe_hits(
         &rules,
