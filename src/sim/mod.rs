@@ -61,7 +61,6 @@ pub mod light_sources;
 pub mod multiplayer_checksum;
 pub mod native_identity;
 pub(crate) mod parallel; // order-preserving work over scoped threads
-pub mod radiation_light;
 pub mod rng;
 pub mod scenario_bootstrap;
 pub mod scenario_post_map;

@@ -82,3 +82,149 @@ production tests must separately exercise real DESO Guard/Bullet creation,
 Foot application order, persistence and later cleanup. They do not establish
 whole RadSite lighting, all layer/default behavior, complete native startup or
 all BulletClass behavior.
+
+## Additive light lifecycle mode
+
+`radiation_damage_boundary.py --light-lifecycle --light-cell 33,88` uses the
+existing `bridge_shadow_render.prepare(radiation=True)` / `PaletteReader`
+runtime. The default six rows and `--overlap` remain separate, unchanged modes.
+The additive corpus is `radiation_light_lifecycle.json`; its sidecar pins the
+actual executable and replay command, with repository sources guarded only
+during execution.
+
+The component reads physical expansion `RULESMD.INI`, optional `LANGRULE.INI`,
+Battle and XMP03T4 in separate native passes. Full Rules/Weapon/Warhead
+constructors supply current defaults; the selected RadLevel block and complete
+Radiation/Warhead readers execute. Fixed ART and destination/basic/animation/
+ISO palettes use the shared archive/cache owner. Existing theater and TMP
+loading choose physical filenames and construct their native descriptors.
+`VERA20K_GAMEMD_EXE` selects the retail executable, as documented in
+[the native runner](../native_oracle.md); the existing
+`VERA20K_PROJECTILE_RENDER_ASSETS` extraction initializes `PaletteReader`.
+
+The supplied coordinate selects an actual empty authored Cell. The decoded
+physical crop within fourteen cells in each axis is provenance only. Exactly
+six sample Cells are allocated: center, offsets `(1,0)`, `(0,1)`, `(5,0)`,
+`(10,0)` and `(11,0)`. Their physical tile/subtile/level tuples pass original
+Cell/Dummy constructors, coordinate setters and TMP slope/land queries. Sparse
+fixed512 table enrollment supplies map storage; original lookup and admission
+run. Full Map Resize/Recalc, authored Overlay objects, Buildings, Techno objects
+and full scenario startup are outside this component. Native-read spread and
+all selected physical sample/material inputs must satisfy the declared bounds.
+
+Original LightSource still scans its full area and uses5657E0 to admit allocated
+targets. Original field spread/decrease/decay instead calls5657A0 for every
+target: a miss stamps the requested coordinates into the one shared Dummy and
+updates its radiation double. Snapshots retain actual Dummy coordinates,
+double bits, site pointer, lookup-miss/field-receiver counts and last native
+field arguments, without resets or normalization. Those aliased missing-cell
+values are a sparse component artifact. They do not establish ordinary complete
+field state, full-circle publication order, cache/reference counts or startup ID
+equivalence. Each selected Cell's gather/falloff reads its own geometry and the
+source/site, without reading neighboring Cell colors or radiation. Broad field
+and dispatch coverage remains the separate overlap and lamp comparisons, with
+normal World integration required independently.
+
+Two independent histories exercise a single lifetime and same-center refresh
+at supplied frame45. Full activation65B580 and AI65B800 execute, including both
+timers, actual LightSource registration/update, Cell483E30/484180 gathering,
+Convert creation and final RadSite65B2F0/LightSource555150 deletion. Each frame
+visits the current native RadSite registry in reverse order. Native observer
+records retain significant timer/source/Cell states, callback order, source
+expiry7258D0 and both real operator-delete call operands. Delete storage is the
+existing no-op transport; the original deleting class bodies still run.
+
+LightPublication's historical Cell sink remains the default for its old lamp
+controls. This mode validates the same receiver/ABI and executes the original
+Cell body, retaining only the existing Map4F42F0 redraw sink. Detail2 and final
+FullInit's publication-enable store are explicit setup. Empty live listener
+registries bound the full pointer-expiry calls; normal World listeners require
+separate integration proof.
+
+All three native streams are independently seeded0 after setup. Complete entry
+and final states and actual request/raw-draw observations accompany the native
+history. Significant live Cell/TMP rasters share that same runtime. RGB565
+192x160 surfaces, point96,120, neutral A127, backgroundFFFF and oldZFFFF are
+declared component priors; the actual uniform A plane is read back. The original
+TMP caller/raster supplies pixels and Z. This does not prove production fog/A
+upload or a complete normal frame.
+
+The selected center's complete physical contiguous TMP family is registered:
+`glat06.tem` and `glat06a.tem`, with `glat06b.tem` physically absent. Both files
+use the shared descriptor constructors and lazy loader on one file transport;
+their native subtile slope/land and image headers are checked. The other five
+sample materials retain independent registrations. Family chain/count metadata
+comes from those physical filenames; full theater filename search is outside
+this component.
+
+Each of the four phases emits one row per physical file, with explicit `phase`
+and `material` fields. Count2 reaches original4814F0's fixed16 table81CCA8;
+generated64 table89E620 cannot select this branch. Rotations of the actual
+original fixed16 values are declared component selector inputs. Original
+4814F0/547CF0 select and traverse the descriptor, observed at547F49, without
+forcing a cached Cell variant or using a host modulo to select the file.
+`output.selected_file_index` retains the raw native draw argument;
+`material.file_index` and filename identify the descriptor actually selected.
+Both selector tables and flag are restored after each phase, and all three
+live RNG streams and native lighting profile must remain unchanged. Every
+physical variant must show changed activation color and exact baseline color/Z
+at expiry. Whole-world selector/Main/table bootstrap equivalence remains open.
+
+Shared setup retains its historical isolated `palette_table` assertion VM and
+the lexical-index transport's isolated native CRC probes. The process therefore
+has more than one VM; RadSite, LightSource,
+Cell gathering and selected live TMP raster all execute in the one existing
+central runtime. No radiation formula or expected color is supplied by Python.
+Actual paid DESO creation, Guard/deploy/shot scheduling, receiver damage and
+audio remain independent production integration obligations.
+
+After the coordinated input/source freeze, the gated commands are:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python -m tools.spatial_oracle.radiation_damage_boundary --light-lifecycle --light-cell 33,88 --write
+PYTHONDONTWRITEBYTECODE=1 python -m tools.spatial_oracle.radiation_damage_boundary --light-lifecycle --light-cell 33,88 --check
+```
+
+The coordinate is a reusable explicit input, not a forced live-game location.
+The generator fails closed on missing physical geometry/materials, unsupported
+spread, unfinished native calls, absent light-to-pixels change, incomplete
+cleanup, timer-bound exhaustion, input drift or unexpected RNG activity. Source
+authoring alone does not establish that these gates have passed.
+
+The shared Reader invocation default remains2M instructions/10s. Only this mode's
+full outer activation65B580, refresh65B530 and AI65B800 opt into20M/120s through
+that same owner, because native area publication can construct many27/53-shade
+Cell Convert tables. The original return boundary is still required; exceeding
+either limit fails. These bounds alter no native inputs, instructions or results.
+The mode's source observer filters irrelevant PCs before reading registers;
+its return-PC index is rebuilt from `NativeCallTrace.pending` after each trace
+mutation, preserving that owner's nested ESP checks. Publication hooks observe
+only the two existing Cell/Map sink addresses. Native palette instructions and
+Cell gathering still execute in full.
+
+Full getter entry/return tracing remains active during execution and must leave
+no pending native return. After those checks, output serialization omits the
+repeated field `cell_coords` receipts and maps every stage event range to its
+exact filtered slice. The small consumed corpus retains all other lifecycle
+events and every state, timer, Dummy, RNG, material and pixel observation.
+Unconsumed bulk getter logs are not committed as a raw archive.
+
+After both histories have actually retired, the last central runtime also runs
+three numeric controls through original `65B871..65B89E`: ordinary positive
+operands, low32 multiplication overflow, and signed operands. Explicit zeroed
+operand storage supplies base tint, remaining time and duration; it is not a
+constructed RadSite. The original three IMUL/IDIV pairs and argument pushes
+execute within200 instructions. The corpus records their actual visited PCs and
+pushed red/green/blue values, stopping before the LightSource call. No Python
+formula supplies expected channels; the signed prior is not an ordinary negative
+field claim.
+
+Two further controls execute full `554AA0` with supplied current/proposed
+parameters in inactive zeroed numeric storage, without a LightSource constructor.
+One changes green while retaining intensity, red and blue; the other changes
+intensity. The original comparison gate and parameter stores execute within200
+instructions, and actual before/after fields are recorded. Active0 must prevent
+area publication. Both kinds of numeric control save and restore CPU/stack and
+assert unchanged live registries, native runtime-ID cursor, final Cell/source
+state, callback counts and all three RNG streams. They add small separate
+top-level control arrays without altering the two histories or their surfaces.

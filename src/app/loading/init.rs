@@ -642,7 +642,7 @@ mod map_wall_owner_candidate_tests {
                 id += 1;
             }
         }
-        let view = derive_lighting_view(&LightingConfig::default(), Some(&sim), Some(&rules), 2);
+        let view = derive_lighting_view(&LightingConfig::default(), Some(&sim), 2);
         assert_eq!(view.point_lights.len(), 9);
         let mut union = std::collections::BTreeSet::new();
         for source in &view.point_lights {
@@ -672,7 +672,7 @@ mod map_wall_owner_candidate_tests {
             CellLightGrid::new(),
             LightingConfig::default(),
             2,
-            Some((&terrain, &sim, &rules)),
+            Some((&terrain, &sim)),
         );
         let before =
             crate::render::palette_light::PaletteLight::cell(lighting.grid(), (24, 24), false);
@@ -688,7 +688,7 @@ mod map_wall_owner_candidate_tests {
         sim.discard_lighting_events();
         fatal_lamp_stage(&mut sim, &rules, 100);
         apply_lighting_events(&mut lighting, &terrain, &mut sim);
-        lighting.refresh(&terrain, &sim, &rules, 2);
+        lighting.refresh(&terrain, &sim, 2);
         assert_eq!(
             lighting
                 .grid()
@@ -713,7 +713,6 @@ mod map_wall_owner_candidate_tests {
     fn match_lighting_global_refresh_publishes_before_the_next_draw() {
         use crate::app::presentation::lighting::MatchLighting;
         let terrain = flat_terrain(128, 128);
-        let rules = lighting_rules();
         let mut sim = Simulation::with_seed(0x1a);
         sim.session.lighting.current_ambient = 30;
         let mut lights = MatchLighting::default();
@@ -721,20 +720,15 @@ mod map_wall_owner_candidate_tests {
             CellLightGrid::new(),
             LightingConfig::default(),
             2,
-            Some((&terrain, &sim, &rules)),
+            Some((&terrain, &sim)),
         );
         let tint_a = lights.grid().terrain_tile_tint_at((1, 1));
-        lights.refresh(&terrain, &sim, &rules, 2);
+        lights.refresh(&terrain, &sim, 2);
         assert_eq!(lights.grid().terrain_tile_tint_at((1, 1)), tint_a);
         sim.session.lighting.current_ambient = 60;
-        let grid_b = rebuild_lighting_grid_from_sim(
-            &terrain,
-            &LightingConfig::default(),
-            Some(&sim),
-            Some(&rules),
-            2,
-        );
-        lights.refresh(&terrain, &sim, &rules, 2);
+        let grid_b =
+            rebuild_lighting_grid_from_sim(&terrain, &LightingConfig::default(), Some(&sim), 2);
+        lights.refresh(&terrain, &sim, 2);
         for cell in [(1, 1), (127, 127)] {
             assert_eq!(
                 lights.grid().terrain_tile_tint_at(cell),
@@ -742,14 +736,9 @@ mod map_wall_owner_candidate_tests {
             );
         }
         sim.session.lighting.current_ambient = 90;
-        let grid_c = rebuild_lighting_grid_from_sim(
-            &terrain,
-            &LightingConfig::default(),
-            Some(&sim),
-            Some(&rules),
-            2,
-        );
-        lights.refresh(&terrain, &sim, &rules, 2);
+        let grid_c =
+            rebuild_lighting_grid_from_sim(&terrain, &LightingConfig::default(), Some(&sim), 2);
+        lights.refresh(&terrain, &sim, 2);
         assert_ne!(tint_a, grid_b.terrain_tile_tint_at((1, 1)));
         assert_ne!(
             grid_b.terrain_tile_tint_at((1, 1)),
@@ -762,7 +751,7 @@ mod map_wall_owner_candidate_tests {
             );
         }
         // An unchanged view must not replay an obsolete earlier global state.
-        lights.refresh(&terrain, &sim, &rules, 2);
+        lights.refresh(&terrain, &sim, 2);
         for cell in [(1, 1), (127, 127)] {
             assert_eq!(
                 lights.grid().terrain_tile_tint_at(cell),
@@ -785,11 +774,11 @@ mod map_wall_owner_candidate_tests {
             CellLightGrid::new(),
             LightingConfig::default(),
             2,
-            Some((&terrain, &sim, &rules)),
+            Some((&terrain, &sim)),
         );
         let restored_tint = lights.grid().terrain_tile_tint_at((1, 1));
         sim.session.lighting.current_ambient = 90;
-        lights.refresh(&terrain, &sim, &rules, 2);
+        lights.refresh(&terrain, &sim, 2);
         sim.set_building_light_active(41, false);
         sim.publish_global_lighting();
         assert!(!sim.lighting_sources.pending.is_empty());
@@ -818,11 +807,11 @@ mod map_wall_owner_candidate_tests {
             CellLightGrid::new(),
             LightingConfig::default(),
             2,
-            Some((&terrain, &sim, &rules)),
+            Some((&terrain, &sim)),
         );
         for _ in 0..3 {
             assert_eq!(lights.grid().terrain_tile_tint_at((1, 1)), restored_tint);
-            lights.refresh(&terrain, &sim, &rules, 2);
+            lights.refresh(&terrain, &sim, 2);
         }
         assert_eq!(lights.grid().terrain_tile_tint_at((1, 1)), restored_tint);
     }
@@ -839,7 +828,7 @@ mod map_wall_owner_candidate_tests {
             CellLightGrid::new(),
             LightingConfig::default(),
             1,
-            Some((&terrain, &sim, &rules)),
+            Some((&terrain, &sim)),
         );
         assert_eq!(
             lights
@@ -849,7 +838,7 @@ mod map_wall_owner_candidate_tests {
                 .raw_additive_intensity,
             0
         );
-        lights.refresh(&terrain, &sim, &rules, 2);
+        lights.refresh(&terrain, &sim, 2);
         assert!(
             lights
                 .grid()
@@ -861,14 +850,9 @@ mod map_wall_owner_candidate_tests {
         let distant = lights.grid().cell_light_at((31, 31)).unwrap().clone();
         sim.destroy_building_light(41);
         sim.entities_mut().remove(41).expect("remove live lamp");
-        lights.refresh(&terrain, &sim, &rules, 2);
-        let rebuilt = rebuild_lighting_grid_from_sim(
-            &terrain,
-            &LightingConfig::default(),
-            Some(&sim),
-            Some(&rules),
-            2,
-        );
+        lights.refresh(&terrain, &sim, 2);
+        let rebuilt =
+            rebuild_lighting_grid_from_sim(&terrain, &LightingConfig::default(), Some(&sim), 2);
         for (cell, light) in rebuilt.cells() {
             let actual = lights.grid().cell_light_at(cell).unwrap();
             assert_eq!(actual.raw_additive_intensity, light.raw_additive_intensity);
@@ -960,7 +944,7 @@ mod map_wall_owner_candidate_tests {
                 CellLightGrid::new(),
                 LightingConfig::default(),
                 2,
-                Some((&terrain, &sim, &rules)),
+                Some((&terrain, &sim)),
             );
             sim.discard_lighting_events();
             (sim, lights)
@@ -1028,7 +1012,7 @@ mod map_wall_owner_candidate_tests {
             CellLightGrid::new(),
             LightingConfig::default(),
             2,
-            Some((&terrain, &sim, &rules)),
+            Some((&terrain, &sim)),
         );
         sim.discard_lighting_events();
 
@@ -1062,7 +1046,6 @@ mod map_wall_owner_candidate_tests {
             &terrain,
             &LightingConfig::default(),
             Some(&rt.simulation),
-            Some(&rt.resources.rules),
             2,
         );
         assert_eq!(
@@ -1115,7 +1098,7 @@ mod map_wall_owner_candidate_tests {
             CellLightGrid::new(),
             LightingConfig::default(),
             2,
-            Some((&terrain, &sim, &rules)),
+            Some((&terrain, &sim)),
         );
         sim.discard_lighting_events();
         sim.set_building_light_active(41, false);
@@ -1153,13 +1136,8 @@ mod map_wall_owner_candidate_tests {
             ]
         ));
         apply_lighting_events(&mut lights, &terrain, &mut sim);
-        let expected = rebuild_lighting_grid_from_sim(
-            &terrain,
-            &LightingConfig::default(),
-            Some(&sim),
-            Some(&rules),
-            2,
-        );
+        let expected =
+            rebuild_lighting_grid_from_sim(&terrain, &LightingConfig::default(), Some(&sim), 2);
         let actual = lights.grid().cell_light_at((4, 5)).unwrap();
         let expected = expected.cell_light_at((4, 5)).unwrap();
         assert_eq!(actual.raw_rgb, expected.raw_rgb);
@@ -1172,7 +1150,7 @@ mod map_wall_owner_candidate_tests {
         assert!(actual.raw_top_scalar > 2000);
         let mut incorrectly_global_last = actual.clone();
         incorrectly_global_last.refresh_retained_scalars(
-            derive_lighting_view(&LightingConfig::default(), Some(&sim), Some(&rules), 2)
+            derive_lighting_view(&LightingConfig::default(), Some(&sim), 2)
                 .profile
                 .units,
             0,
@@ -1201,7 +1179,7 @@ mod map_wall_owner_candidate_tests {
             CellLightGrid::new(),
             LightingConfig::default(),
             2,
-            Some((&terrain, &sim, &rules)),
+            Some((&terrain, &sim)),
         );
         let original_key = lights.grid().cell_light_at((4, 5)).unwrap().rgb_key;
         sim.session.lighting.select(ScenarioLightingProfile::Ion);
@@ -1318,13 +1296,13 @@ mod map_wall_owner_candidate_tests {
         let owner = seed_live_lamp(&mut sim, &rules);
         let config = LightingConfig::default();
 
-        let lit = derive_lighting_view(&config, Some(&sim), Some(&rules), 2);
+        let lit = derive_lighting_view(&config, Some(&sim), 2);
         assert_eq!(
             lit.point_lights.len(),
             1,
             "BuildingUp does not suppress LightSource"
         );
-        let low_detail = derive_lighting_view(&config, Some(&sim), Some(&rules), 1);
+        let low_detail = derive_lighting_view(&config, Some(&sim), 1);
         assert!(low_detail.point_lights.is_empty());
         assert_ne!(lit, low_detail);
 
@@ -1333,7 +1311,7 @@ mod map_wall_owner_candidate_tests {
         power_state.total_drain = 100;
         power_state.is_low_power = true;
         sim.power_states.insert(owner, power_state);
-        let offline = derive_lighting_view(&config, Some(&sim), Some(&rules), 2);
+        let offline = derive_lighting_view(&config, Some(&sim), 2);
         // House508C30->454CE0 RET and Building4549B0 animation-only
         // effects do not call LightSource disable on ordinary power loss.
         assert_eq!(offline.point_lights, lit.point_lights);
@@ -1342,24 +1320,24 @@ mod map_wall_owner_candidate_tests {
         let power = sim.power_states.get_mut(&owner).expect("power state");
         power.total_output = 100;
         power.is_low_power = false;
-        let restored = derive_lighting_view(&config, Some(&sim), Some(&rules), 2);
+        let restored = derive_lighting_view(&config, Some(&sim), 2);
         assert_eq!(restored.point_lights.len(), 1);
         assert_eq!(lit, restored);
 
         sim.set_building_light_active(41, false);
-        let disabled = derive_lighting_view(&config, Some(&sim), Some(&rules), 2);
+        let disabled = derive_lighting_view(&config, Some(&sim), 2);
         assert!(disabled.point_lights.is_empty());
         // Repeated allocation/construction must not reactivate an existing614.
         sim.allocate_building_light(41, &rules);
         assert!(
-            derive_lighting_view(&config, Some(&sim), Some(&rules), 2)
+            derive_lighting_view(&config, Some(&sim), 2)
                 .point_lights
                 .is_empty()
         );
         sim.set_building_light_active(41, true);
         fatal_lamp_stage(&mut sim, &rules, 41);
         assert!(
-            derive_lighting_view(&config, Some(&sim), Some(&rules), 2)
+            derive_lighting_view(&config, Some(&sim), 2)
                 .point_lights
                 .is_empty()
         );
@@ -1374,7 +1352,7 @@ mod map_wall_owner_candidate_tests {
         let captured_owner = sim.interner.intern("Captured");
         let config = LightingConfig::default();
 
-        let before_capture = derive_lighting_view(&config, Some(&sim), Some(&rules), 2);
+        let before_capture = derive_lighting_view(&config, Some(&sim), 2);
         assert_eq!(before_capture.point_lights.len(), 1);
 
         let mut power_state = PowerState::default();
@@ -1383,7 +1361,7 @@ mod map_wall_owner_candidate_tests {
         power_state.is_low_power = true;
         sim.power_states.insert(captured_owner, power_state);
         sim.change_owner(41, captured_owner);
-        let captured_offline = derive_lighting_view(&config, Some(&sim), Some(&rules), 2);
+        let captured_offline = derive_lighting_view(&config, Some(&sim), 2);
         assert_eq!(captured_offline.point_lights, before_capture.point_lights);
         assert_eq!(before_capture, captured_offline);
 
@@ -1393,14 +1371,14 @@ mod map_wall_owner_candidate_tests {
             .expect("captured owner power state");
         power.total_output = 100;
         power.is_low_power = false;
-        let captured_online = derive_lighting_view(&config, Some(&sim), Some(&rules), 2);
+        let captured_online = derive_lighting_view(&config, Some(&sim), 2);
         assert_eq!(captured_online.point_lights.len(), 1);
         assert_eq!(before_capture, captured_online);
 
         assert!(crate::sim::production::sell_building_now_for_test(
             &mut sim, &rules, 41
         ));
-        let sold = derive_lighting_view(&config, Some(&sim), Some(&rules), 2);
+        let sold = derive_lighting_view(&config, Some(&sim), 2);
         assert!(sold.point_lights.is_empty());
         assert_ne!(captured_online, sold);
     }
@@ -1428,7 +1406,7 @@ mod map_wall_owner_candidate_tests {
         );
 
         let terrain = flat_terrain(10, 10);
-        let view = derive_lighting_view(&LightingConfig::default(), Some(&sim), Some(&rules), 2);
+        let view = derive_lighting_view(&LightingConfig::default(), Some(&sim), 2);
         assert_eq!(view.profile.units.ambient_percent, 80);
         assert_eq!(
             view.point_lights.len(),
@@ -1475,7 +1453,7 @@ mod map_wall_owner_candidate_tests {
             None,
             &mut sim.lighting_sources.pending,
         );
-        let first = derive_lighting_view(&LightingConfig::default(), Some(&sim), Some(&rules), 2);
+        let first = derive_lighting_view(&LightingConfig::default(), Some(&sim), 2);
         assert_eq!(first.point_lights.len(), 1);
 
         sim.radiation.apply_detonation(
@@ -1485,7 +1463,7 @@ mod map_wall_owner_candidate_tests {
             None,
             &mut sim.lighting_sources.pending,
         );
-        let merged = derive_lighting_view(&LightingConfig::default(), Some(&sim), Some(&rules), 2);
+        let merged = derive_lighting_view(&LightingConfig::default(), Some(&sim), 2);
         assert_eq!(merged.point_lights.len(), 1);
         assert_ne!(first, merged);
         assert_ne!(

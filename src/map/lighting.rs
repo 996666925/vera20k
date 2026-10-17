@@ -780,7 +780,7 @@ where
 ///
 /// Created from map entity data during map load. Each light contributes
 /// localized brightness to nearby cells using linear distance falloff.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct PointLight {
     /// Cell position of the light source.
     pub rx: u16,
@@ -799,6 +799,22 @@ pub struct PointLight {
     pub active: bool,
     /// Detail-level gate placeholder for ordinary light sources.
     pub detail: bool,
+}
+
+impl PointLight {
+    /// LightSource554AA0, original gamemd.exe: the equal-intensity fast path
+    /// compares the retained red to both incoming red and incoming blue.
+    /// Green and the retained blue do not participate in this native gate.
+    /// Return whether the native write branch ran; the caller owns area
+    /// publication. That branch can run even for identical parameters.
+    pub(crate) fn update_parameters(&mut self, intensity: i32, tint: [i32; 3]) -> bool {
+        if self.intensity == intensity && self.tint[0] == tint[0] && self.tint[0] == tint[2] {
+            return false;
+        }
+        self.intensity = intensity;
+        self.tint = tint;
+        true
+    }
 }
 
 /// Renderer-local counterpart of the pending records consumed by YR

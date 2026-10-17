@@ -14,6 +14,257 @@ fn cell(value: &serde_json::Value) -> (u16, u16) {
     )
 }
 
+/// Full native activation/AI/removal, including the independent light clock.
+/// The before-AI refresh is an explicit component input, separate from the
+/// paid opening's Bullet phase. Neither history imports Rust expected values.
+#[test]
+fn light_lifecycle_matches_original_site_and_cell_boundaries() {
+    use crate::sim::light_sources::LightingEvent;
+
+    let Some((root, _)) = crate::rules::retail_ini_fixture::retail_assets() else {
+        return;
+    };
+    let scene = crate::headless_scenario::load(&root, "XMP03T4.MAP", 0).unwrap();
+    let rules = &scene.runtime.resources.rules;
+    let terrain = scene.sim().resolved_terrain.as_ref();
+    let native = crate::test_fixture::json("tools/spatial_oracle/radiation_light_lifecycle.json");
+    for history in native["histories"].as_array().unwrap() {
+        let name = history["name"].as_str().unwrap();
+        let input = &history["input"];
+        let center = cell(&input["center"]);
+        let weapon = rules
+            .weapon(input["source"]["weapon"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(weapon.rad_level, integer(&input["source"]["rad_level"]));
+        let spread = crate::sim::combat::cell_spread::whole_cells(
+            rules
+                .warhead(weapon.warhead.as_deref().unwrap())
+                .unwrap()
+                .cell_spread_f64,
+        );
+        assert_eq!(spread, integer(&input["source"]["spread"]));
+        for supplied in input["setup"]["geometry"]["allocated"].as_array().unwrap() {
+            let at = cell(&supplied["cell"]);
+            let actual = terrain.unwrap().cell(at.0, at.1).unwrap();
+            assert_eq!(i32::from(actual.level), integer(&supplied["level"]));
+            assert_eq!(i32::from(actual.slope_type), integer(&supplied["slope"]));
+        }
+        let detonation = RadDetonation {
+            rx: center.0,
+            ry: center.1,
+            rad_level: weapon.rad_level,
+            spread,
+        };
+        let mut state = RadiationState::default();
+        let mut events = Vec::new();
+        let mut source = None;
+        let mut publish = |events: &mut Vec<LightingEvent>| {
+            for event in events.drain(..) {
+                match event {
+                    LightingEvent::Radiation {
+                        center: at,
+                        source: next,
+                    } => {
+                        assert_eq!(at, center);
+                        source = next;
+                    }
+                    other => panic!("unexpected radiation owner publication {other:?}"),
+                }
+            }
+            source.clone()
+        };
+        state.apply_detonation(detonation, 0, &rules.radiation, terrain, &mut events);
+        let mut current_source = publish(&mut events);
+        let mut frame = 0;
+        let refresh = input["refresh_frame"].as_u64().map(|frame| frame as u32);
+        for stage in history["stages"].as_array().unwrap() {
+            let expected = &stage["state"];
+            let end = expected["frame"].as_u64().unwrap() as u32;
+            while frame < end {
+                frame += 1;
+                if refresh == Some(frame) {
+                    state.apply_detonation(
+                        detonation,
+                        frame,
+                        &rules.radiation,
+                        terrain,
+                        &mut events,
+                    );
+                }
+                state.tick_decay(frame, &rules.radiation, terrain, &mut events);
+                current_source = publish(&mut events);
+            }
+            if expected["site"].is_null() {
+                assert!(
+                    state.site_at(center).is_none(),
+                    "{name} frame{frame}: removal"
+                );
+                assert!(
+                    current_source.is_none(),
+                    "{name} frame{frame}: source removal"
+                );
+            } else {
+                let actual = state.site_at(center).unwrap();
+                let site = &expected["site"];
+                for (value, key) in [
+                    (actual.radius_leptons, "radius"),
+                    (actual.level, "level"),
+                    (actual.level_steps, "level_steps"),
+                    (actual.duration, "duration"),
+                    (actual.remaining, "remaining"),
+                ] {
+                    assert_eq!(value, integer(&site[key]), "{name} frame{frame} {key}");
+                }
+                assert_eq!(
+                    actual.level_timer.start_frame(),
+                    integer(&site["level_timer"][0]),
+                    "{name} frame{frame}"
+                );
+                assert_eq!(
+                    actual.level_timer.duration(),
+                    integer(&site["level_timer"][1]),
+                    "{name} frame{frame}"
+                );
+                assert_eq!(
+                    serde_json::json!([
+                        actual.light.timer.start_frame(),
+                        actual.light.timer.duration()
+                    ]),
+                    site["light_timer"],
+                    "{name} frame{frame}: independent light clock"
+                );
+                assert_eq!(serde_json::json!(actual.light.base_tint), site["tint"]);
+                assert_eq!(actual.light.decrement, integer(&site["light_decrement"]));
+                let light = &expected["light"];
+                let actual = current_source.as_ref().expect("retained native source");
+                assert_eq!(
+                    actual.intensity,
+                    integer(&light["intensity"]),
+                    "{name} frame{frame}: source intensity"
+                );
+                assert_eq!(
+                    serde_json::json!(actual.tint),
+                    light["tint"],
+                    "{name} frame{frame}: source tint"
+                );
+                assert_eq!(actual.radius_leptons, integer(&light["radius"]));
+                assert_eq!(actual.active, light["active"].as_u64().unwrap() != 0);
+            }
+            for sample in expected["samples"].as_array().unwrap() {
+                let at = cell(&sample["cell"]);
+                assert_eq!(
+                    format!("{:016x}", state.cell_level(at).to_bits()),
+                    sample["radiation_bits"],
+                    "{name} frame{frame} Cell{at:?}"
+                );
+                let registered = state.site_at(at).is_some();
+                assert_eq!(
+                    registered,
+                    sample["radsite"].as_u64().unwrap() != 0,
+                    "{name} frame{frame}: Cell registration{at:?}"
+                );
+            }
+            if name == "same_center_refresh" && frame == 134 {
+                // Persist the actual native-bound component immediately
+                // before its independent light deadline. This empty World
+                // envelope is a snapshot control, not a paid-game bootstrap.
+                let mut world = crate::sim::world::Simulation::with_seed(0);
+                world.session.binary_frame = frame;
+                world.radiation = state.clone();
+                let before = world.state_hash();
+                let bytes = crate::sim::snapshot::GameSnapshot::save(
+                    &world,
+                    0,
+                    0,
+                    "native-radiation-clock",
+                    0,
+                );
+                let mut loaded = crate::sim::snapshot::GameSnapshot::load(&bytes)
+                    .unwrap()
+                    .sim;
+                loaded.restore_after_snapshot_load().unwrap();
+                assert_eq!(
+                    bincode::serialize(&loaded.radiation).unwrap(),
+                    bincode::serialize(&state).unwrap(),
+                    "load must preserve the source and independent clock"
+                );
+                world
+                    .radiation
+                    .sites
+                    .get_mut(&center)
+                    .unwrap()
+                    .light
+                    .timer
+                    .start(46, 90);
+                assert_ne!(
+                    before,
+                    world.state_hash(),
+                    "retained source clock is hashed"
+                );
+                // Continue through the original135 boundary using the loaded
+                // owner, rather than reconstructing a projection from age.
+                state = loaded.radiation;
+            }
+        }
+        assert!(state.sites().next().is_none());
+    }
+}
+
+/// Explicit numeric priors execute in the same native runtime after its real
+/// lifecycles retire. These controls certify the consumed integer/gate bodies,
+/// without claiming native constructors for the supplied operand storage.
+#[test]
+fn light_parameters_match_original_integer_and_update_controls() {
+    let native = crate::test_fixture::json("tools/spatial_oracle/radiation_light_lifecycle.json");
+    let tint = |value: &serde_json::Value| std::array::from_fn(|i| integer(&value[i]));
+    let rows = native["tint_integer_controls"].as_array().unwrap();
+    assert_eq!(rows.len(), 3);
+    for row in rows {
+        let input = &row["input"];
+        assert_eq!(
+            serde_json::json!(fade_rad_tint(
+                tint(&input["base"]),
+                integer(&input["remaining"]),
+                integer(&input["duration"]),
+            )),
+            row["output"]["tint"],
+            "{}",
+            row["name"]
+        );
+    }
+    let rows = native["light_update_controls"].as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    for row in rows {
+        let input = &row["input"];
+        let current = &input["current"];
+        let mut source = lighting::radiation_point_light(
+            1,
+            1,
+            128,
+            integer(&current["intensity"]),
+            tint(&current["tint"]),
+        );
+        source.active = integer(&current["active"]) != 0;
+        let changed = source.update_parameters(
+            integer(&input["proposed"]["intensity"]),
+            tint(&input["proposed"]["tint"]),
+        );
+        assert_eq!(source.intensity, integer(&row["output"]["intensity"]));
+        assert_eq!(serde_json::json!(source.tint), row["output"]["tint"]);
+        assert_eq!(source.active, integer(&row["output"]["active"]) != 0);
+        assert_eq!(
+            changed,
+            row["visited"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|pc| pc == "00554AC0"),
+            "native parameter-store branch {}",
+            row["name"]
+        );
+    }
+}
+
 #[test]
 fn field_operations_match_native_overlap_controls() {
     let Some(fixture) = crate::rules::retail_ini_fixture::retail_battle_rules() else {

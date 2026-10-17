@@ -21,6 +21,37 @@ SOURCE, TABLE, CELLS = 0xB00000, 0xC00000, 0x3000000
 WIDTH = HEIGHT = 128
 
 
+def publication_observer(u, read32, valid_cell, calls, redraws, *, substitute_cell=True):
+    """Observe this owner's native Cell ABI and retain its Map redraw seam.
+
+    A composed runtime can execute real Cell light gathering by opting out of
+    the historical Cell sink. It must validate each actual receiver itself.
+    This helper creates no VM, source, Cell, result or expected light value.
+    """
+    def observe(uc, address, _size, _data):
+        if address not in (0x483E30, 0x4F42F0):
+            return
+        sp = uc.reg_read(UC_X86_REG_ESP)
+        receiver = uc.reg_read(UC_X86_REG_ECX)
+        if address == 0x483E30:
+            if not valid_cell(receiver):
+                raise RuntimeError(f'non-fixture Cell pointer: {receiver:#x}')
+            args = struct.unpack('<6I', uc.mem_read(sp + 4, 24))
+            if args != (0, 65536, 0, 1000, 1000, 1000):
+                raise RuntimeError(f'non-recompute Cell arguments: {args}')
+            calls.append(list(struct.unpack('<HH', uc.mem_read(receiver + 0x24, 4))))
+            if not substitute_cell:
+                return
+            cleanup = 24
+        else:
+            redraws.append(struct.unpack('<I', uc.mem_read(sp + 4, 4))[0])
+            cleanup = 4
+        destination = read32(sp)
+        uc.reg_write(UC_X86_REG_ESP, sp + 4 + cleanup)
+        uc.reg_write(UC_X86_REG_EIP, destination)
+    return observe
+
+
 def stock_lamp_sequence():
     u = Uc(UC_ARCH_X86, UC_MODE_32)
     load_image(u)
@@ -44,28 +75,8 @@ def stock_lamp_sequence():
     u.reg_write(UC_X86_REG_FPCW, 0x0E7F)
     calls, redraws = [], []
 
-    def observe(uc, address, _size, _data):
-        if address not in (0x483E30, 0x4F42F0):
-            return
-        sp = uc.reg_read(UC_X86_REG_ESP)
-        receiver = uc.reg_read(UC_X86_REG_ECX)
-        if address == 0x483E30:
-            if not CELLS <= receiver < CELLS + WIDTH * HEIGHT * 0x200:
-                raise RuntimeError(f'non-fixture Cell pointer: {receiver:#x}')
-            args = struct.unpack('<6I', uc.mem_read(sp + 4, 24))
-            if args != (0, 65536, 0, 1000, 1000, 1000):
-                raise RuntimeError(f'non-recompute Cell arguments: {args}')
-            calls.append(list(struct.unpack('<HH', uc.mem_read(receiver + 0x24, 4))))
-            cleanup = 24
-        else:
-            redraws.append(struct.unpack('<I', uc.mem_read(sp + 4, 4))[0])
-            cleanup = 4
-        # Only the two declared output sinks are replaced. Original wrapper,
-        # area walk, slot admission, Cell lookup, sqrt and ftol all execute.
-        destination = struct.unpack('<I', uc.mem_read(sp, 4))[0]
-        uc.reg_write(UC_X86_REG_ESP, sp + 4 + cleanup)
-        uc.reg_write(UC_X86_REG_EIP, destination)
-
+    observe = publication_observer(u, lambda p: struct.unpack('<I', u.mem_read(p, 4))[0],
+        lambda p: CELLS <= p < CELLS + WIDTH * HEIGHT * 0x200, calls, redraws)
     u.hook_add(UC_HOOK_CODE, observe)
     events, area = [], None
     for name, entry, detail, enabled in [

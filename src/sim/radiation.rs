@@ -3,7 +3,7 @@
 //! per-site countdown, and self-delete when their lifetime expires. Foot
 //! units standing on irradiated cells take periodic damage through the
 //! `[Radiation] RadSiteWarhead=` warhead (applied during each Foot AI, not
-//! here — this module owns only the field state and its evolution).
+//! here — this module owns the field, sites and their retained light sources).
 //!
 //! Depends on `rules/` ([Radiation] constants), `map/resolved_terrain`
 //! (cell ground height for 3D falloff distance) and `util/lepton`.
@@ -17,9 +17,11 @@
 //! integer math; distance keeps its existing owner ([`cell_distance_leptons`]).
 
 use std::collections::BTreeMap;
+use std::hash::{Hash, Hasher};
 
 use serde::{Deserialize, Serialize};
 
+use crate::map::lighting::{self, LIGHT_CLAMP_MAX, LIGHT_UNIT, PointLight};
 use crate::map::resolved_terrain::ResolvedTerrainGrid;
 use crate::rules::ruleset::RadiationRules;
 use crate::sim::light_sources::LightingEvent;
@@ -67,6 +69,107 @@ pub struct RadSite {
     /// with `RadLevelDelay=` at each activation and decay step
     /// (`RadSiteClass::AI @ 0x0065B80E`).
     pub level_timer: CdTimer,
+    /// Independent source clock and retained output, owned by this site.
+    /// A before-AI activation decrements lifetime on its creation frame but
+    /// does not advance this timer. Neither rendering nor load restarts it.
+    light: RadiationLight,
+}
+
+impl RadSite {
+    /// Current source parameters, without deriving age from the lifetime.
+    /// Callers receive a value; the site remains the sole mutation owner.
+    pub fn light_source(&self) -> Option<PointLight> {
+        self.light.source.clone()
+    }
+
+    fn activate_light(&mut self, frame: u32, rules: &RadiationRules) -> bool {
+        let light = &mut self.light;
+        light.timer = CdTimer::started(frame as i32, rules.light_delay);
+        if self.duration < 1 {
+            return light.source.take().is_some();
+        }
+        // Retain the rules owner's SimFixed factors. Wide integer scaling
+        // truncates toward zero without float work in a simulation update.
+        // Native uses doubles; arbitrary factor quantization remains outside
+        // the stock source controls in radiation_light_lifecycle.json.
+        let scaled = |value: i32, factor: crate::util::fixed_math::SimFixed| {
+            (i64::from(value) * i64::from(factor.to_bits()) / 65_536)
+                .clamp(i64::from(i32::MIN), i64::from(LIGHT_CLAMP_MAX)) as i32
+        };
+        let intensity = scaled(self.level, rules.light_factor);
+        light.base_tint = [rules.color.0, rules.color.1, rules.color.2]
+            .map(|channel| scaled(i32::from(channel) * LIGHT_UNIT / 255, rules.tint_factor));
+        // The selected retail levels have at least one light step. Preserve
+        // the previous defensive handling of shorter custom lifetimes; this
+        // does not claim native divide-fault equivalence for that domain.
+        light.decrement = intensity / (self.duration / rules.light_delay.max(1)).max(1);
+        match &mut light.source {
+            Some(source) => source.update_parameters(intensity, light.base_tint),
+            None => {
+                light.source = Some(lighting::radiation_point_light(
+                    self.center.0,
+                    self.center.1,
+                    self.radius_leptons,
+                    intensity,
+                    light.base_tint,
+                ));
+                true
+            }
+        }
+    }
+
+    pub(crate) fn hash_into(&self, hasher: &mut impl Hasher) {
+        self.center.hash(hasher);
+        self.spread.hash(hasher);
+        self.radius_leptons.hash(hasher);
+        self.level.hash(hasher);
+        self.level_steps.hash(hasher);
+        self.duration.hash(hasher);
+        self.remaining.hash(hasher);
+        self.level_timer.start_frame().hash(hasher);
+        self.level_timer.duration().hash(hasher);
+        self.light.hash(hasher);
+    }
+}
+
+/// RadSite65B580/65B800 and its retained LightSource. These integer outputs
+/// are independent of viewer/detail settings and persist with the site.
+#[derive(Debug, Clone, Default, Hash, Serialize, Deserialize)]
+struct RadiationLight {
+    timer: CdTimer,
+    base_tint: [i32; 3],
+    decrement: i32,
+    source: Option<PointLight>,
+}
+
+impl RadiationLight {
+    fn advance(
+        &mut self,
+        frame: u32,
+        remaining: i32,
+        duration: i32,
+        rules: &RadiationRules,
+    ) -> bool {
+        if !self.timer.expired(frame as i32) {
+            return false;
+        }
+        self.timer.start(frame as i32, rules.light_delay);
+        let Some(source) = &mut self.source else {
+            return false;
+        };
+        //65B871..65B8A4: remaining was already decremented by this AI.
+        source.update_parameters(
+            source.intensity.wrapping_sub(self.decrement),
+            fade_rad_tint(self.base_tint, remaining, duration),
+        )
+    }
+}
+
+///65B874..65B898: three low-dword IMULs followed by signed IDIV. A wide
+/// product changes long-lived stacked sources; native overflow/sign controls
+/// in radiation_light_lifecycle.json exercise this exact shared operation.
+fn fade_rad_tint(base: [i32; 3], remaining: i32, duration: i32) -> [i32; 3] {
+    base.map(|channel| channel.wrapping_mul(remaining) / duration)
 }
 
 /// The per-cell radiation field + site registry. Persisted and state-hashed.
@@ -75,7 +178,9 @@ pub struct RadiationState {
     /// Sparse per-cell radiation level. Entries are removed when they decay
     /// to exactly 0 (the subtraction clamps negative results to 0).
     cells: BTreeMap<(u16, u16), f64>,
-    /// One site per center cell.
+    /// One site per center cell. For canonical real Cells, membership is the
+    /// Cell487C70/487C80 center marker; deletion clears it while residual F0
+    /// levels remain. This does not model arbitrary off-map/Dummy pointers.
     sites: BTreeMap<(u16, u16), RadSite>,
     /// RadSiteClass ctor65B27E appends to the process vector; Logic55B5D2
     /// visits it backwards. A merge retains its slot, and dtor65B36A removes
@@ -180,7 +285,23 @@ impl RadiationState {
     /// A native component fixture supplies retained site words without
     /// claiming to have executed a detonation or field activation.
     #[cfg(any(test, feature = "test-support"))]
-    pub(crate) fn from_retained_site_for_test(site: RadSite) -> Self {
+    pub(crate) fn from_retained_site_for_test(
+        center: (u16, u16),
+        level: i32,
+        duration: i32,
+        remaining: i32,
+    ) -> Self {
+        let site = RadSite {
+            center,
+            spread: 0,
+            radius_leptons: 128,
+            level,
+            level_steps: 0,
+            duration,
+            remaining,
+            level_timer: CdTimer::default(),
+            light: RadiationLight::default(),
+        };
         Self {
             creation_order: vec![site.center],
             sites: BTreeMap::from([(site.center, site)]),
@@ -351,10 +472,13 @@ impl RadiationState {
     }
 
     /// (Re)arm the decay countdown and derive the per-lifetime step count.
-    fn activate_site(&mut self, center: (u16, u16), frame: u32, rules: &RadiationRules) {
+    fn activate_site(&mut self, center: (u16, u16), frame: u32, rules: &RadiationRules) -> bool {
         if let Some(site) = self.sites.get_mut(&center) {
             site.level_steps = site.duration / rules.level_delay;
             site.level_timer = CdTimer::started(frame as i32, rules.level_delay);
+            site.activate_light(frame, rules)
+        } else {
+            false
         }
     }
 
@@ -417,6 +541,7 @@ impl RadiationState {
                         duration,
                         remaining: duration,
                         level_timer: CdTimer::started(frame as i32, rules.level_delay),
+                        light: RadiationLight::default(),
                     },
                 );
                 self.creation_order.push(center);
@@ -433,15 +558,14 @@ impl RadiationState {
                 site.remaining = duration;
             }
         }
-        self.activate_site(center, frame, rules);
+        let light_changed = self.activate_site(center, frame, rules);
         self.spread_site(center, terrain);
         // RadSite activation65B7CA/65B7E8 publishes source changes in this
         // interval, even if another change later returns to the same inputs.
-        let source = self
-            .sites
-            .get(&center)
-            .and_then(|site| crate::sim::radiation_light::radiation_site_light(site, rules));
-        lights.push(LightingEvent::Radiation { center, source });
+        let source = self.sites.get(&center).and_then(RadSite::light_source);
+        if light_changed {
+            lights.push(LightingEvent::Radiation { center, source });
+        }
     }
 
     /// Per-tick site evolution: lifetime countdown, the periodic per-cell
@@ -463,10 +587,6 @@ impl RadiationState {
         // earlier slot; cloning the identities retains that same visit order.
         let centers: Vec<_> = self.creation_order.iter().rev().copied().collect();
         for center in centers {
-            let previous_light = self
-                .sites
-                .get(&center)
-                .and_then(|site| crate::sim::radiation_light::radiation_site_light(site, rules));
             // Lifetime ticks down every frame, independent of the decay timer.
             let (expired, dead) = {
                 let Some(site) = self.sites.get_mut(&center) else {
@@ -481,18 +601,22 @@ impl RadiationState {
                     site.level_timer = CdTimer::started(frame as i32, rules.level_delay);
                 }
             }
+            if let Some(site) = self.sites.get_mut(&center)
+                && site
+                    .light
+                    .advance(frame, site.remaining, site.duration, rules)
+            {
+                lights.push(LightingEvent::Radiation {
+                    center,
+                    source: site.light_source(),
+                });
+            }
             if dead {
                 self.sites.remove(&center);
                 self.creation_order.retain(|retained| *retained != center);
-            }
-            let current_light = self
-                .sites
-                .get(&center)
-                .and_then(|site| crate::sim::radiation_light::radiation_site_light(site, rules));
-            if previous_light != current_light {
                 lights.push(LightingEvent::Radiation {
                     center,
-                    source: current_light,
+                    source: None,
                 });
             }
         }

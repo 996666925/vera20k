@@ -17,6 +17,9 @@
 //! The seed contract mirrors the original engine: one 32-bit word seeds the scenario and
 //! main streams identically, fixed before any setup-phase draw.
 
+#[cfg(any(test, feature = "test-support"))]
+pub mod radiation_test_evidence;
+
 use std::path::Path;
 
 use crate::assets::asset_manager::{AssetManager, MediaArchiveMode};

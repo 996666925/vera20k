@@ -44,6 +44,283 @@ fn a_pixels(input: &Value, size: [u32; 2]) -> Vec<u8> {
     }
 }
 
+/// The paid opening and admitted Deploy commands run in the shared scenario
+/// visitor. MatchLighting consumes every ordinary frame publication, without
+/// reconstructing sources after installation. Native source/Cell/TMP evidence:
+/// RadSite65B580/65B800 -> LightSource554AF0 -> Cell483E30 -> TMP547CF0.
+/// Native selector-input controls cover each physical GLAT06 file; comparison
+/// follows the ordinary World's variant without overriding its selector.
+#[test]
+#[ignore = "requires retail assets and GPU; paid DESO lifecycle through ordered lighting events and native TMP pixels"]
+fn paid_deso_light_lifecycle_reaches_native_cell_and_tmp_pixels() {
+    use crate::app::presentation::lighting::MatchLighting;
+    use crate::headless_scenario::radiation_test_evidence::visit_paid_deso_light_lifecycle;
+
+    let packet = crate::test_fixture::json("tools/spatial_oracle/radiation_light_lifecycle.json");
+    let history = packet["histories"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|history| history["name"] == "single_lifetime")
+        .unwrap();
+    let setup = &history["input"]["setup"];
+    let coords: [u16; 2] =
+        std::array::from_fn(|i| history["input"]["center"][i].as_u64().unwrap() as u16);
+    let physical = setup["geometry"]["allocated"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|cell| cell["cell"] == serde_json::json!(coords))
+        .unwrap();
+    let tile_id = physical["tile"].as_u64().unwrap() as u16;
+    let sub_tile = physical["subtile"].as_u64().unwrap() as u8;
+    let root = PathBuf::from(std::env::var_os("RA2_DIR").expect("physical retail root"));
+    let mut assets = AssetManager::new(&root, MediaArchiveMode::STOCK_DIGITAL).unwrap();
+    let theater = load_theater(&mut assets, "TEMPERATE").unwrap();
+    let mapping = setup["tmp"]["mappings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|mapping| mapping["tile_id"].as_u64() == Some(u64::from(tile_id)))
+        .unwrap();
+    let native_filename = format!(
+        "{}{:02}.tem",
+        mapping["file_name"].as_str().unwrap(),
+        u64::from(tile_id) - mapping["base"].as_u64().unwrap() + 1
+    );
+    assert!(
+        theater
+            .lookup
+            .filename(i32::from(tile_id))
+            .unwrap()
+            .eq_ignore_ascii_case(&native_filename),
+        "production binding must select the original theater reader's material"
+    );
+    for source in setup["sources"].as_array().unwrap() {
+        let name = source["name"].as_str().unwrap();
+        assert_eq!(
+            crate::util::sha256::sha256_hex(assets.get_ref(name).unwrap()),
+            source["sha256"].as_str().unwrap(),
+            "native/production physical input {name}"
+        );
+    }
+    for phase in ["baseline", "activated", "first_light_decay", "expired"] {
+        let mut variants: Vec<_> = history["rasters"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|row| row["phase"] == phase)
+            .map(|row| row["material"]["file_index"].as_u64().unwrap())
+            .collect();
+        variants.sort_unstable();
+        assert_eq!(
+            variants,
+            (0..u64::from(theater.lookup.total_file_count(tile_id))).collect::<Vec<_>>(),
+            "{phase}: original draws must cover the complete physical family"
+        );
+    }
+    let tiles = load_tile_images(
+        &assets,
+        &theater.lookup,
+        &theater.iso_palette,
+        &HashSet::from([TileKey {
+            tile_id,
+            sub_tile,
+            variant: 0,
+        }]),
+    );
+    assert!(!tiles.is_empty());
+    let shp = crate::assets::shp_file::ShpFile::from_bytes(assets.get_ref("SHROUD.SHP").unwrap())
+        .unwrap();
+    let (frames, frame_w, frame_h) = crate::render::shroud_buffer::extract_shp_brightness(&shp);
+    let size: [u32; 2] = std::array::from_fn(|i| {
+        packet["surface"][if i == 0 { "width" } else { "height" }]
+            .as_u64()
+            .unwrap() as u32
+    });
+    let gpu = Gpu::new();
+    let mut renderers = [
+        wgpu::TextureFormat::Bgra8UnormSrgb,
+        wgpu::TextureFormat::Rgba8UnormSrgb,
+    ]
+    .map(|format| {
+        let batch = BatchRenderer::new_with_device(&gpu.device, &gpu.queue, format);
+        let atlas = crate::render::tile_atlas::build_atlas(&gpu.device, &gpu.queue, &batch, &tiles);
+        (format, batch, atlas, InstanceBufferPool::new())
+    });
+    let mut lighting = MatchLighting::default();
+    let mut a = None;
+    let mut compared = Vec::new();
+    visit_paid_deso_light_lifecycle(|phase, scene, output| {
+        if output.is_none() {
+            assert_eq!(phase, Some("loaded"));
+            assert!(scene.sim().radiation.is_empty());
+            lighting.install(
+                crate::map::lighting::CellLightGrid::new(),
+                crate::map::lighting::parse_lighting(&scene.map.ini),
+                2,
+                Some((scene.sim().resolved_terrain.as_ref().unwrap(), scene.sim())),
+            );
+            a = Some(ShroudBuffer::new(
+                &gpu.device,
+                &gpu.queue,
+                size,
+                [scene.sim().fog.width, scene.sim().fog.height],
+                frames.clone(),
+                [frame_w, frame_h],
+                crate::render::shroud_buffer::SHROUD_EDGE_LUT,
+            ));
+        } else {
+            lighting.apply_events(
+                scene.sim().resolved_terrain.as_ref().unwrap(),
+                &output.unwrap().lighting_events,
+            );
+        }
+        let Some(phase) = phase else {
+            return;
+        };
+        let name = match phase {
+            "loaded" => "baseline",
+            "active" => "activated",
+            "faded" => "first_light_decay",
+            "expired" | "settled" => "expired",
+            other => panic!("unexpected paid radiation phase {other}"),
+        };
+        let hash = scene.sim().state_hash();
+        assert!(
+            scene
+                .runtime
+                .simulation
+                .prepare_fog_view_for("VERA-OBSERVER")
+        );
+        let terrain = scene.sim().resolved_terrain.as_ref().unwrap();
+        let live = terrain.cell(coords[0], coords[1]).unwrap();
+        assert_eq!(terrain.presentation_tile(live), (tile_id, sub_tile));
+        assert_eq!(u64::from(live.level), physical["level"].as_u64().unwrap());
+        assert_eq!(
+            u64::from(live.slope_type),
+            physical["slope"].as_u64().unwrap()
+        );
+        let rows: Vec<_> = history["rasters"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|row| {
+                row["phase"] == name
+                    && row["material"]["file_index"].as_u64() == Some(u64::from(live.variant))
+            })
+            .collect();
+        assert_eq!(rows.len(), 1, "{phase}: native physical variant coverage");
+        let row = rows[0];
+        let input = &row["input"];
+        assert!(
+            theater
+                .lookup
+                .filename_for_variant(tile_id, live.variant)
+                .unwrap()
+                .eq_ignore_ascii_case(row["material"]["filename"].as_str().unwrap()),
+            "{phase}: production/native selected physical material"
+        );
+        assert_eq!(profile(input), scene.sim().session.lighting.normal.into());
+        let light = lighting
+            .grid()
+            .cell_light_at((coords[0], coords[1]))
+            .unwrap();
+        assert_eq!(
+            serde_json::json!(light.rgb_key),
+            row["output"]["convert_rgb_key"],
+            "{phase}"
+        );
+        for (actual, key) in [
+            (light.top_scalar, "top_scalar"),
+            (light.bottom_scalar, "bottom_scalar"),
+            (light.common_scalar, "common_scalar"),
+        ] {
+            assert_eq!(
+                i64::from(actual),
+                row["output"][key].as_i64().unwrap(),
+                "{phase} {key}"
+            );
+        }
+        // The oracle declares a component draw point, rather than a Tactical
+        // camera. Use that same explicit seam and the existing projection.
+        assert!(input.get("full_view").is_none());
+        let point = iso_to_screen(coords[0], coords[1], 0);
+        let mut camera = camera(size);
+        camera.camera_pos = [
+            point.0 - input["cell_point"][0].as_i64().unwrap() as f32,
+            point.1
+                - input["cell_point"][1].as_i64().unwrap() as f32
+                - input["viewport_y"].as_i64().unwrap() as f32,
+        ];
+        let a = a.as_mut().unwrap();
+        a.rebuild_if_needed(
+            &gpu.device,
+            &gpu.queue,
+            &scene.sim().fog,
+            scene.sim().session.current_house.unwrap(),
+            camera.camera_pos[0],
+            camera.camera_pos[1],
+            size[0],
+            size[1],
+            1.0,
+        );
+        let actual_a: Vec<_> = gpu
+            .read_float_texels(a.gpu_source().0, [0, 0], size)
+            .into_iter()
+            .map(|pixel| (pixel[0] * 255.0).round() as u8)
+            .collect();
+        assert_eq!(actual_a, a_pixels(input, size), "{phase}: actual live A");
+        let mut grid = build_terrain_grid_from_resolved(terrain, None, None);
+        grid.cells.retain(|cell| [cell.rx, cell.ry] == coords);
+        assert_eq!(grid.cells.len(), 1);
+        for (format, batch, atlas, pool) in &mut renderers {
+            let lookup = |tile_id, sub_tile, variant| {
+                atlas
+                    .get_uv(TileKey {
+                        tile_id,
+                        sub_tile,
+                        variant,
+                    })
+                    .map(|uv| TilePlacement {
+                        uv_origin: uv.uv_origin,
+                        uv_size: uv.uv_size,
+                        pixel_size: uv.pixel_size,
+                        draw_offset: uv.draw_offset,
+                    })
+            };
+            let instances = crate::render::terrain_instances::build_visible_instances(
+                &grid,
+                Some(lighting.grid()),
+                camera.camera_pos[0],
+                camera.camera_pos[1],
+                size[0] as f32,
+                size[1] as f32,
+                Some(&lookup),
+                Some(terrain),
+            );
+            assert_eq!(instances.normal.len(), 1);
+            pool.upload_on_device(
+                &gpu.device,
+                &gpu.queue,
+                "tmp-clear-native",
+                &instances.normal,
+            );
+            assert_tmp_raster(&gpu, batch, pool, atlas, a, camera, row, *format, size);
+        }
+        assert_eq!(
+            scene.sim().state_hash(),
+            hash,
+            "{phase}: presentation is read-only"
+        );
+        compared.push(phase.to_owned());
+    });
+    assert_eq!(
+        compared,
+        ["loaded", "active", "faded", "expired", "settled"]
+    );
+}
+
 /// Normal Battle construction supplies all sight and Cell knowledge. The native
 /// component independently constructs AMCV on physical GoldSt terrain; its eight
 /// TMP variants share one live A plane, so the normal selector needs no override.
@@ -188,11 +465,7 @@ fn assert_retail_amcv_sight_raster(moving: bool) {
         crate::map::lighting::CellLightGrid::new(),
         crate::map::lighting::parse_lighting(&scene.map.ini),
         2,
-        Some((
-            scene.sim().resolved_terrain.as_ref().unwrap(),
-            scene.sim(),
-            &scene.runtime.resources.rules,
-        )),
+        Some((scene.sim().resolved_terrain.as_ref().unwrap(), scene.sim())),
     );
     let mut renderers = [
         wgpu::TextureFormat::Bgra8UnormSrgb,
@@ -659,11 +932,7 @@ fn assert_retail_tmp_rasters(packet: &Value, filename: &str, sub_tile: u8) {
                 crate::map::lighting::CellLightGrid::new(),
                 crate::map::lighting::parse_lighting(&scene.map.ini),
                 2,
-                Some((
-                    scene.sim().resolved_terrain.as_ref().unwrap(),
-                    scene.sim(),
-                    &scene.runtime.resources.rules,
-                )),
+                Some((scene.sim().resolved_terrain.as_ref().unwrap(), scene.sim())),
             );
             (scene, lighting, hash)
         });

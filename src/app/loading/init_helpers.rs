@@ -584,7 +584,6 @@ pub(crate) fn finish_presentation_assets(
         resolved_terrain,
         lighting_config,
         Some(simulation),
-        Some(rules),
         detail_level,
     );
     crate::app::loading::init::PresentationLoadAssets {

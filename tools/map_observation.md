@@ -2738,3 +2738,20 @@ synchronously; the retained render-index entries remain anchors, and their live
 identity resolves at draw time. Generic placement upserts are not required for
 every bridge transition. The profile records ordinary gameplay and rendering;
 its shot count and timing are not native mission/RNG goldens.
+
+### Paid Desolator deploy, undeploy and radiation light
+
+[map_observation.radiation-light.example.json](map_observation.radiation-light.example.json)
+starts Iraq on XMP03T4 and builds the ordinary power, barracks, refinery and
+radar prerequisites before paying for DESO1575. The sidebar observation and
+shared production test establish the enabled option before queueing; the
+production event receiver alone does not repeat that prerequisite decision.
+The unit exits the barracks and moves to
+(33,88); selection and two command-bar Deploy gestures start and stop its
+normal self-fire. The resulting field fades after undeployment.
+
+The cursor rests on the sidebar at (700,500), so selection does not leave an
+animated world-order cursor in the final frame. The profile records ordinary
+production and visible field cleanup. Its elapsed frames, object IDs and RNG
+are captured Rust inputs, rather than native mission goldens. Native source,
+Cell lighting and TMP comparisons live with the radiation oracle and tests.

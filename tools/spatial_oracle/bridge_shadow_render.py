@@ -44,8 +44,9 @@ def ints(u, address, count):
 
 def physical_assets(*, body=False, ore=False, tile=False, placement=False, radar=False,
                     frontier=False, tmp_names=(), smudge=False, hills=False, ore_natural=False, wall=False,
-                    wall_materials=()):
+                    wall_materials=(), radiation=False, tmp_families=()):
     assert wall or not wall_materials
+    assert tile or not tmp_families
     root = configured_gamemd().parent
     sources, assets = [], {}
     containers = (
@@ -112,12 +113,34 @@ def physical_assets(*, body=False, ore=False, tile=False, placement=False, radar
                       ('Hills.mmx', {None: ('Hills.map',)}))
     if hills:
         containers += (('Hills.mmx', {None: ('Hills.map',)}),)
+    if radiation:
+        # The radiation component uses this archive/cache owner and the same
+        # palette/TMP runtime; it enrolls no unrelated overlay material/type.
+        containers = (
+            ('ra2.mix', {'cache.mix': ('palette.pal', 'anim.pal', 'isotem.pal', 'temperat.pal')}),
+            ('ra2md.mix', {'localmd.mix': ('ARTMD.INI', 'MPBattleMD.ini', 'TEMPERATMD.INI')}),
+            ('multimd.mix', {None: ('XMP03T4.MAP',)}),
+        )
     for outer_name, children in containers:
         outer_raw = (root / outer_name).read_bytes()
         outer = mix(outer_raw)
         for inner_name, names in children.items():
             inner_raw = outer[mix_hash(inner_name)] if inner_name is not None else outer_raw
             inner = mix(inner_raw)
+            families = {}
+            if tile and inner_name == 'isotemp.mix' and tmp_families:
+                names = list(names)
+                for base in tmp_families:
+                    assert base in names and base.endswith('.tem'), base
+                    family = [base]
+                    for suffix in 'abcdefghijklmnopqrstuvwxyz':
+                        name = base[:-4] + suffix + '.tem'
+                        if mix_hash(name) not in inner: break
+                        family.append(name)
+                    else:
+                        raise AssertionError('Selected TMP family has no bounded absent suffix')
+                    families[base] = dict(names=family, next_absent=name)
+                    names.extend(name for name in family if name not in names)
             if tile and inner_name == 'isotemp.mix':
                 assert mix_hash('clear01h.tem') not in inner
             if frontier and inner_name == 'isourb.mix':
@@ -125,11 +148,13 @@ def physical_assets(*, body=False, ore=False, tile=False, placement=False, radar
             for name in names:
                 raw = inner[mix_hash(name)]
                 assets[name.upper()] = raw
-                sources.append(dict(name=name, outer=outer_name, inner=inner_name,
-                                    outer_sha256=hashlib.sha256(outer_raw).hexdigest(),
-                                    inner_sha256=hashlib.sha256(inner_raw).hexdigest(),
-                                    sha256=hashlib.sha256(raw).hexdigest(), bytes=len(raw)))
-    if ore or placement or frontier or smudge or wall:
+                source = dict(name=name, outer=outer_name, inner=inner_name,
+                              outer_sha256=hashlib.sha256(outer_raw).hexdigest(),
+                              inner_sha256=hashlib.sha256(inner_raw).hexdigest(),
+                              sha256=hashlib.sha256(raw).hexdigest(), bytes=len(raw))
+                if name in families: source['variant_family'] = families[name]
+                sources.append(source)
+    if ore or placement or frontier or smudge or wall or radiation:
         # Active retail's expansion archive overrides the base RULESMD.
         raw = (root / 'expandmd01.mix').read_bytes()
         rules = mix(raw)[mix_hash('RULESMD.INI')]
@@ -137,7 +162,7 @@ def physical_assets(*, body=False, ore=False, tile=False, placement=False, radar
         sources.append(dict(name='RULESMD.INI', outer='expandmd01.mix', inner=None,
                             outer_sha256=hashlib.sha256(raw).hexdigest(),
                             sha256=hashlib.sha256(rules).hexdigest(), bytes=len(rules)))
-        if not smudge:
+        if not smudge and not radiation:
             raw = (root / 'GoldSt.mmx').read_bytes()
             assets['GOLDST.MMX'] = raw
             sources.append(dict(name='GoldSt.mmx', kind='loose', outer=None, inner=None,
@@ -146,11 +171,11 @@ def physical_assets(*, body=False, ore=False, tile=False, placement=False, radar
 
 
 def prepare(*, body=False, ore=False, placement=False, ore_natural=False, wall=False,
-            wall_types=(), wall_materials=()):
-    assert sum((body, ore, placement, wall)) <= 1
+            wall_types=(), wall_materials=(), radiation=False):
+    assert sum((body, ore, placement, wall, radiation)) <= 1
     assert wall or not (wall_types or wall_materials)
     assets, sources = physical_assets(body=body, ore=ore, placement=placement,
-        ore_natural=ore_natural, wall=wall, wall_materials=wall_materials)
+        ore_natural=ore_natural, wall=wall, wall_materials=wall_materials, radiation=radiation)
     map_filename = 'XMP03T4.MAP' if ore_natural or wall else 'GoldSt.mmx'
     shadow_bytes, shape_aliases = {}, []
     for name, raw in assets.items():
@@ -173,9 +198,9 @@ def prepare(*, body=False, ore=False, placement=False, ore_natural=False, wall=F
                                    shadow_frames_sha256=hashlib.sha256(normalized).hexdigest()))
     assert all(len(images) == 6 and all(raw == images[0] for raw in images)
                for images in shadow_bytes.values())
-    selected_types = ('GAPOWR',) if placement else (wall_types or WALL_TYPES) if wall else ORE_TYPES if ore else BRIDGE_TYPES
+    selected_types = () if radiation else ('GAPOWR',) if placement else (wall_types or WALL_TYPES) if wall else ORE_TYPES if ore else BRIDGE_TYPES
     art, art_lines = lexical(assets['ARTMD.INI'], set(selected_types)
-                             | (set() if ore or wall else {'BRIDGE', 'BRIDGB'}))
+                             | (set() if ore or wall or radiation else {'BRIDGE', 'BRIDGB'}))
     m = PaletteReader(art)
     m.assets.update(assets)
     initialize(m, ordinary=ore, early_temperat=placement)
@@ -248,7 +273,7 @@ def prepare(*, body=False, ore=False, placement=False, ore_natural=False, wall=F
                   physical_art=art, art_source_lines=art_lines, layers=layers)
     if wall:inputs.update(overlay_theater=inputs_theater,theater=wall_theater)
     if wall_types or wall_materials:inputs['wall_images']=image_states
-    if body or wall:
+    if body or wall or radiation:
         inputs['cell_convert'] = initialize_cell_convert(m)
     if ore:
         inputs['ordinary_convert'] = ordinary_convert_state(m)
@@ -908,7 +933,7 @@ def generate_ore():
                 rows=rows, controls=controls, lifecycle=sequence, radar=generate_radar(m, types))
 
 
-def prepare_selected_tiles(m, assets, inputs, selected):
+def prepare_selected_tiles(m, assets, inputs, selected, *, variant_tile=None):
     """One selected-theater/TMP/lighting owner for Cell raster components."""
     from tools.spatial_oracle import tmp_clear_render as tile
     u = m.u
@@ -925,12 +950,24 @@ def prepare_selected_tiles(m, assets, inputs, selected):
             mappings.append(other_mapping)
     filenames = tuple(dict.fromkeys(tiles[tile_id] for tile_id in tile_ids))
     filename = tiles[initial['tile']]
-    extra, extra_sources = physical_assets(tile=True, tmp_names=filenames)
+    assert variant_tile is None or variant_tile in tile_ids
+    families = () if variant_tile is None else (tiles[variant_tile],)
+    extra, extra_sources = physical_assets(tile=True, tmp_names=filenames, tmp_families=families)
+    variant_families = {row['name']: row['variant_family']['names'] for row in extra_sources
+                        if 'variant_family' in row}
+    if variant_families:
+        inputs['tmp_families'] = {row['name']: row['variant_family'] for row in extra_sources
+                                 if 'variant_family' in row}
+        filenames = tuple(dict.fromkeys((*filenames, *(name for family in variant_families.values() for name in family))))
     m.assets.update(extra)
     inputs['sources'].extend(row for row in extra_sources if row['name'].lower() in filenames)
     for entry in (0x7C5F3D,0x7C5FFF): m.invoke(entry,0)
     m.phase='authored_fence_tmp_load' # Shared physical-file receipt label.
-    heads, file_io = tile.load_tmp_files(m,{name:extra[name.upper()] for name in filenames})
+    if variant_families:
+        heads, file_io = tile.load_tmp_files(m,{name:extra[name.upper()] for name in filenames},
+                                            variant_families=variant_families)
+    else:
+        heads, file_io = tile.load_tmp_files(m,{name:extra[name.upper()] for name in filenames})
     registry = m.alloc(len(tiles)*4)
     for tile_id in tile_ids:u.mem_write(registry+tile_id*4,dwords(heads[tiles[tile_id]]))
     u.mem_write(0xA8ED2C,dwords(registry));u.mem_write(0xA8ED38,dwords(len(tiles)))

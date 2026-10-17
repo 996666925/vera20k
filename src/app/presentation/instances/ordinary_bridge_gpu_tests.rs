@@ -272,7 +272,7 @@ impl Probe {
             CellLightGrid::new(),
             parse_lighting(&scene.map.ini),
             2,
-            Some((&terrain, scene.sim(), rules)),
+            Some((&terrain, scene.sim())),
         );
         let palette = assets.resolve_ref(fixture.theater().3).unwrap();
         let profile = crate::map::lighting::normal_profile_units(&parse_lighting(&scene.map.ini));
@@ -380,7 +380,7 @@ impl Probe {
         let sim = scene.sim();
         let before = sim.state_hash();
         let rules = &scene.runtime.resources.rules;
-        self.lighting.refresh(&self.terrain, sim, rules, 2);
+        self.lighting.refresh(&self.terrain, sim, 2);
         let id = self.fixture.overlay(phase, row);
         let center = self.fixture.center();
         let entries: Vec<_> = self
@@ -746,8 +746,7 @@ impl Probe {
         // no equality of their upstream flag producers is asserted.
         assert_eq!(cell.bridge_facts.raw_flags & 0x80, 0);
         assert_eq!(input["flags"], 2);
-        self.lighting
-            .refresh(terrain, scene.sim(), &scene.runtime.resources.rules, 2);
+        self.lighting.refresh(terrain, scene.sim(), 2);
         let light = self.lighting.grid().cell_light_at(coord).unwrap();
         assert_eq!(
             i64::from(light.common_scalar),

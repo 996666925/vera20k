@@ -27,7 +27,7 @@ use crate::sim::mission::{MissionDispatchTimer, MissionId, MissionTimer};
 use crate::sim::movement::ground_pose;
 use crate::sim::movement::locomotion::piggyback::{LocomotorRuntimePayload, WalkRuntime};
 use crate::sim::movement::locomotor::LocomotorState;
-use crate::sim::radiation::{RadSite, RadiationState};
+use crate::sim::radiation::RadiationState;
 use crate::sim::rng::SimRng;
 use crate::sim::stage::StageClass;
 use crate::sim::timer::CdTimer;
@@ -215,16 +215,12 @@ fn supplied_fixture(row: &Value) -> (Simulation, RuleSet, u64) {
     if input["site"].is_object() {
         // Supplied retained site words; no detonation/activation producer is
         // certified by this component fixture. Its owner maintains membership.
-        sim.radiation = RadiationState::from_retained_site_for_test(RadSite {
-            center: (10, 10),
-            spread: 0,
-            radius_leptons: 128,
-            level: signed(&input["site"]["level"]),
-            level_steps: 0,
-            duration: signed(&input["site"]["duration"]),
-            remaining: signed(&input["site"]["remaining"]),
-            level_timer: CdTimer::default(),
-        });
+        sim.radiation = RadiationState::from_retained_site_for_test(
+            (10, 10),
+            signed(&input["site"]["level"]),
+            signed(&input["site"]["duration"]),
+            signed(&input["site"]["remaining"]),
+        );
     }
     let actor = sim.substrate.entities.get_mut(id).unwrap();
     actor.health.set_for_test(100);

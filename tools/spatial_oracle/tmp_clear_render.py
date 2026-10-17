@@ -61,7 +61,7 @@ def profile(m, raw=None):
     return dict(zip(keys, (struct.unpack('<i', u.mem_read(scenario + off, 4))[0] for off in offsets)))
 
 
-def load_tmp_files(m, files, *, chain=False, prepared_files=None):
+def load_tmp_files(m, files, *, chain=False, prepared_files=None, variant_families=None):
     """Shared original TMP constructor/lazy IO owner; no host TMP decoding.
 
     A variant chain constructs all descriptors before loading. Independent
@@ -69,6 +69,8 @@ def load_tmp_files(m, files, *, chain=False, prepared_files=None):
     are supplied registration boundaries, not a second theater loader.
     Optional prepared_files admit other physical/absent RawFile probes on
     this same transport; they do not register additional TMP descriptors.
+    Optional variant_families groups selected physical files on this same
+    transport; other files retain independent construction/loading.
     """
     u = m.u
     platform = NativeAudioPlatform(m, configured_gamemd().parent)
@@ -86,16 +88,26 @@ def load_tmp_files(m, files, *, chain=False, prepared_files=None):
         image = m.invoke(0x544CB0, head)
         assert image == m.read32(head + 0xA4) and m.read32(head + 0xA8) & 255
         assert bytes(u.mem_read(image, 16)) == files[name][:16]
-    for i, name in enumerate(files):
-        head = m.alloc(0x400)
-        m.invoke(0x5447C0, head, (0, -65, 0, m.cstring(name[:-4]), chain and i != 0))
-        u.mem_write(head + 0x2F4, b'\1' + name.encode() + b'\0')
-        heads[name] = head
-        if not chain:
-            load(name, head)
-    if chain:
-        values = list(heads.values())
-        for i, (name, head) in enumerate(heads.items()):
+    variant_families = variant_families or {}
+    assert not chain or not variant_families
+    members = [name for family in variant_families.values() for name in family]
+    assert len(members) == len(set(members)) and set(members) <= set(files)
+    assert all(family and family[0] == base for base, family in variant_families.items())
+    groups = [list(files)] if chain else [variant_families.get(name, [name])
+                                         for name in files if name not in members or name in variant_families]
+    for group in groups:
+        linked = chain or group[0] in variant_families
+        for i, name in enumerate(group):
+            head = m.alloc(0x400)
+            m.invoke(0x5447C0, head, (0, -65, 0, m.cstring(name[:-4]), linked and i != 0))
+            u.mem_write(head + 0x2F4, b'\1' + name.encode() + b'\0')
+            heads[name] = head
+            if not linked:
+                load(name, head)
+        if not linked: continue
+        values = [heads[name] for name in group]
+        for i, name in enumerate(group):
+            head = heads[name]
             u.mem_write(head + 0x2BC, dwords(values[i + 1] if i + 1 < len(values) else 0))
             u.mem_write(head + 0x2F0, dwords(len(values) - i))
             load(name, head)

@@ -410,7 +410,7 @@ impl MatchLighting {
         grid: CellLightGrid,
         config: LightingConfig,
         detail_level: u32,
-        live: Option<(&ResolvedTerrainGrid, &Simulation, &RuleSet)>,
+        live: Option<(&ResolvedTerrainGrid, &Simulation)>,
     ) {
         *self = Self {
             grid,
@@ -419,12 +419,12 @@ impl MatchLighting {
             ..Self::default()
         };
         self.profile = lighting::normal_profile_units(&self.config).into();
-        if let Some((terrain, sim, rules)) = live {
-            let view = derive_lighting_view(&self.config, Some(sim), Some(rules), detail_level);
+        if let Some((terrain, sim)) = live {
+            let view = derive_lighting_view(&self.config, Some(sim), detail_level);
             self.grid = build_lighting_grid_from_view(terrain, &view);
             self.profile = view.profile;
             self.scenario = Some(sim.session.lighting);
-            (self.buildings, self.radiation) = source_maps(sim, rules);
+            (self.buildings, self.radiation) = source_maps(sim);
         }
     }
 
@@ -511,7 +511,6 @@ impl MatchLighting {
         &mut self,
         terrain: &ResolvedTerrainGrid,
         sim: &Simulation,
-        rules: &RuleSet,
         detail_level: u32,
     ) {
         if self.detail_level != detail_level.min(2) {
@@ -521,11 +520,11 @@ impl MatchLighting {
                 CellLightGrid::new(),
                 self.config.clone(),
                 detail_level,
-                Some((terrain, sim, rules)),
+                Some((terrain, sim)),
             );
             return;
         }
-        let (buildings, radiation) = source_maps(sim, rules);
+        let (buildings, radiation) = source_maps(sim);
         let mut events = Vec::new();
         for id in self
             .buildings
@@ -586,18 +585,12 @@ fn queue_area(
     );
 }
 
-fn source_maps(
-    sim: &Simulation,
-    rules: &RuleSet,
-) -> (BTreeMap<u64, PointLight>, BTreeMap<(u16, u16), PointLight>) {
+fn source_maps(sim: &Simulation) -> (BTreeMap<u64, PointLight>, BTreeMap<(u16, u16), PointLight>) {
     (
         sim.lighting_sources.buildings.clone(),
         sim.radiation
             .sites()
-            .filter_map(|site| {
-                crate::sim::radiation_light::radiation_site_light(site, &rules.radiation)
-                    .map(|source| (site.center, source))
-            })
+            .filter_map(|site| site.light_source().map(|source| (site.center, source)))
             .collect(),
     )
 }
@@ -637,7 +630,6 @@ pub(crate) struct DerivedLightingView {
 pub(crate) fn derive_lighting_view(
     lighting_config: &LightingConfig,
     simulation: Option<&Simulation>,
-    rules: Option<&RuleSet>,
     detail_level: u32,
 ) -> DerivedLightingView {
     let profile = simulation.map_or_else(
@@ -647,12 +639,14 @@ pub(crate) fn derive_lighting_view(
     let alternate_rgb = simulation.and_then(|sim| sim.session.lighting.alternate_rgb());
 
     let building_lights = collect_live_building_lights(simulation, detail_level);
-    let radiation_lights = match (simulation, rules) {
-        (Some(sim), Some(rules)) => {
-            crate::sim::radiation_light::collect_radiation_lights(sim, rules)
-        }
-        _ => Vec::new(),
-    };
+    let radiation_lights = simulation
+        .map(|sim| {
+            sim.radiation
+                .sites()
+                .filter_map(|site| site.light_source())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
 
     let mut point_lights = Vec::with_capacity(building_lights.len() + radiation_lights.len());
     point_lights.extend(building_lights);
@@ -689,10 +683,9 @@ pub(crate) fn rebuild_lighting_grid_from_sim(
     resolved_terrain: &ResolvedTerrainGrid,
     lighting_config: &LightingConfig,
     simulation: Option<&Simulation>,
-    rules: Option<&RuleSet>,
     detail_level: u32,
 ) -> CellLightGrid {
-    let view = derive_lighting_view(lighting_config, simulation, rules, detail_level);
+    let view = derive_lighting_view(lighting_config, simulation, detail_level);
     build_lighting_grid_from_view(resolved_terrain, &view)
 }
 

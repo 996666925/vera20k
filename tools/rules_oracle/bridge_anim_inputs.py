@@ -51,9 +51,9 @@ class Reader(Lists):
   out=self.cursor;self.cursor+=(n+15)&~15;assert self.cursor<HEAP+self.arena_size;return out
  def cstring(self,s):
   raw=s.encode('latin1')+b'\0';ptr=self.alloc(len(raw));self.u.mem_write(ptr,raw);return ptr
- def invoke(self,addr,obj,args=(),*,timeout_us=10_000_000,context=None):
+ def invoke(self,addr,obj,args=(),*,timeout_us=10_000_000,context=None,instruction_limit=2_000_000):
   self.u.mem_write(SP,dwords(RET_MAGIC,*args));self.u.reg_write(UC_X86_REG_ESP,SP);self.u.reg_write(UC_X86_REG_ECX,obj)
-  run_checked(self.u,addr,RET_MAGIC,count=2000000,timeout_us=timeout_us,context=context)
+  run_checked(self.u,addr,RET_MAGIC,count=instruction_limit,timeout_us=timeout_us,context=context)
   return self.u.reg_read(UC_X86_REG_EAX)
  def install_waypoint_character_format_transport(self):
   """Supply only ToLetters763610's two Windows wsprintfA calls.

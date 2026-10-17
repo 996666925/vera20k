@@ -1383,15 +1383,7 @@ impl Simulation {
             level.to_bits().hash(hasher);
         }
         for site in self.radiation.sites_in_update_order() {
-            site.center.hash(hasher);
-            site.spread.hash(hasher);
-            site.radius_leptons.hash(hasher);
-            site.level.hash(hasher);
-            site.level_steps.hash(hasher);
-            site.duration.hash(hasher);
-            site.remaining.hash(hasher);
-            site.level_timer.start_frame().hash(hasher);
-            site.level_timer.duration().hash(hasher);
+            site.hash_into(hasher);
         }
     }
 

@@ -1288,7 +1288,6 @@ fn refresh_cell_lighting(state: &mut AppState) {
     presentation.lighting.refresh(
         terrain,
         &runtime.simulation,
-        &runtime.resources.rules,
         presentation.in_game_options.detail_level,
     );
 }

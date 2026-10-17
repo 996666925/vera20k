@@ -107,7 +107,7 @@ fn stock_lamp_loaded_by_scenario_changes_actual_terrain_pixels() {
         CellLightGrid::new(),
         parse_lighting(&scenario.map.ini),
         2,
-        Some((terrain, &scenario.runtime.simulation, rules)),
+        Some((terrain, &scenario.runtime.simulation)),
     );
     let lit_scalar = lighting
         .grid()
@@ -148,7 +148,7 @@ fn stock_lamp_loaded_by_scenario_changes_actual_terrain_pixels() {
     );
     let events = std::mem::take(&mut scenario.runtime.simulation.lighting_sources.pending);
     lighting.apply_events(terrain, &events);
-    lighting.refresh(terrain, &scenario.runtime.simulation, rules, 2);
+    lighting.refresh(terrain, &scenario.runtime.simulation, 2);
     let dark_scalar = lighting
         .grid()
         .cell_light_at((rx, ry))
