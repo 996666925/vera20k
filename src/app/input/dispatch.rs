@@ -22,7 +22,7 @@ use crate::app::input::commands::{
     queue_build_by_type, queue_house_cheer, schedule_command, spawn_test_units_for_local_owner,
     suspend_build,
 };
-use crate::app::input::context_order::try_queue_context_order_at_screen_point;
+use crate::app::input::context_order::{ContextOrderTarget, try_queue_context_order};
 use crate::app::input::entity_pick::{
     SelectionMutation, compute_box_selection_snapshot_with_playfield,
     compute_click_selection_snapshot_with_playfield,
@@ -418,7 +418,8 @@ fn band_box_left_up(state: &mut AppState) {
         route_click_action_before_type_select(action, |sx, sy| {
             // A resolved context dispatch consumes the click
             // even when its receiver admits no command.
-            try_queue_context_order_at_screen_point(state, sx, sy, true).then_some(())
+            try_queue_context_order(state, ContextOrderTarget::ScreenPoint(sx, sy), true)
+                .then_some(())
         },),
         ClickActionRoute::ContextOrder(())
     ) {
@@ -690,9 +691,9 @@ fn band_caught_drawn_object(
 }
 
 /// Minimap mouse body (routed here when the minimap ClickRegion consumes the
-/// edge). gamemd (decompile 0x006539D0) centers the tactical view on press
-/// edges (left OR right) and IGNORES held motion — there is no continuous
-/// camera-follow (the held branch is dropped in `handle_cursor_moved_in_game`).
+/// edge). Radar6539D0 ignores held motion. An admitted selected action
+/// consumes left press and dispatches on left release; the other press
+/// paths center the view (653D6F), including every right press.
 pub(crate) fn minimap_mouse(state: &mut AppState, button: MouseButton, btn_state: ElementState) {
     if crate::app::input::campaign_input::is_locked(state) {
         return;
@@ -700,14 +701,23 @@ pub(crate) fn minimap_mouse(state: &mut AppState, button: MouseButton, btn_state
     match button {
         MouseButton::Left => {
             if btn_state.is_pressed() {
-                crate::app::presentation::sidebar_render::try_begin_minimap_drag(state);
+                if crate::app::presentation::sidebar_render::try_begin_minimap_drag(state)
+                    && minimap_order_target(state).is_none()
+                {
+                    crate::app::presentation::sidebar_render::update_camera_from_minimap_cursor(state);
+                }
             } else if state.match_state.input.minimap_dragging {
                 state.match_state.input.minimap_dragging = false;
+                // With an admitted selection action, the release is the
+                // command edge (flags bit 0x04, 0x00653D58); route it through the same
+                // context-order owner as a tactical click.
+                queue_minimap_order(state);
             }
         }
         MouseButton::Right
-            // A right-press centers the view on the clicked cell (no command);
-            // right-release just releases the gadget's sticky capture.
+            // A right-press centers the view on the clicked cell. Native
+            // command dispatch is on left-release (flags bit 0x04), even
+            // when units are selected.
             if btn_state.is_pressed()
                 && crate::app::presentation::sidebar_render::is_cursor_over_minimap(state)
             => {
@@ -715,6 +725,27 @@ pub(crate) fn minimap_mouse(state: &mut AppState, button: MouseButton, btn_state
             }
         _ => {}
     }
+}
+
+fn queue_minimap_order(state: &mut AppState) {
+    if let Some(target) = minimap_order_target(state) {
+        try_queue_context_order(state, ContextOrderTarget::Radar(target), true);
+        // BandBox_LeftUp's common exit ends the sticky attack-move mode.
+        state.match_state.input.queued_order_mode = OrderMode::Move;
+    }
+}
+
+fn minimap_order_target(state: &AppState) -> Option<crate::render::radar::NativeRadarInputTarget> {
+    if state.match_state.input.targeting_mode.is_some()
+        || !crate::app::presentation::sidebar_render::is_cursor_over_minimap(state)
+    {
+        return None;
+    }
+    let target = crate::app::presentation::sidebar_render::minimap_input_target(state)?;
+    crate::app::input::cursor::minimap_action_is_admitted(
+        crate::app::input::cursor::minimap_action_feedback(state, target),
+    )
+    .then_some(target)
 }
 
 /// Handle cursor-move behavior while in-game.

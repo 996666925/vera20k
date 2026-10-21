@@ -121,21 +121,12 @@ pub(crate) fn current_cursor_feedback_kind(state: &AppState) -> Option<CursorFee
     {
         // The radar draws the descriptor table's mini sets, not the tactical
         // main sets: the RadarClass mouse handler (`0x006539D0`) reaches
-        // `SetCursorFromAction` with `mini = 1`, whose switch (byte table
-        // `0x004AB838` indexed by action, jump table `0x004AB7D0`) is its own
-        // action-to-row map. Its keep-table filter (`0x00653F04`, action-1
+        // `SetCursorFromAction` with `mini = 1`. The normal action switch
+        // selects the row on revealed cells; the shroud branch uses byte
+        // table4AB838 / jump table4AB7D0. Radar's keep table (653F04, action-1
         // indexed) drops every action outside {1,2,3,5,6,9,16,20,26,38,41,65,
         // 66,67,72} to row 0 — the plain arrow mini (frame 1) — and the
         // fallthrough exit at `0x00653D62` is `SetCursorRow(0, mini = 1)`.
-        // RESIDUAL: the original derives the radar action from the armed
-        // superweapon mode (`0x008809A0`) or the selected object's
-        // What_Action_On_Cell at the radar cell (handler tail, `0x00653C6A`),
-        // so with a selection over a radar cell that itself holds a selectable
-        // object retail answers the arrow mini where VERA keeps the move
-        // cluster; that needs the radar-cell hover target, which the tactical
-        // feedback path does not expose. Trigger: hovering the minimap with a
-        // selection. Player effect: the move cluster instead of the arrow in
-        // that sub-case. Frequency: occasional. Downstream risk: none.
         return Some(minimap_cursor_feedback(state));
     }
     if current_sidebar_view_hit(state) {
@@ -307,6 +298,34 @@ pub(crate) fn current_cursor_feedback_kind(state: &AppState) -> Option<CursorFee
     if selected.is_empty() {
         return no_selection_cursor(hover.as_ref());
     }
+    selected_target_feedback(
+        state,
+        sim,
+        owner_id,
+        &selected,
+        hover_object,
+        (hover_rx, hover_ry),
+        modifier,
+        force_move_key,
+        true,
+    )
+}
+
+/// Shared What_Action and class post-processing for tactical and radar picks.
+/// Radar653C6A differs only in how it obtains the cell/object, not these rungs.
+#[allow(clippy::too_many_arguments)]
+fn selected_target_feedback(
+    state: &AppState,
+    sim: &crate::sim::world::Simulation,
+    owner_id: Option<crate::sim::intern::InternedId>,
+    selected: &[u64],
+    hover_object: Option<HoverObject>,
+    (hover_rx, hover_ry): (u16, u16),
+    modifier: super::context_order::OrderModifier,
+    force_move_key: bool,
+    show_attack_move: bool,
+) -> Option<CursorFeedbackKind> {
+    let hover = hover_object.and_then(HoverObject::techno);
     // gamemd's DetermineAction resolves ONE object for the whole selection and
     // shows that object's action, for the cell branch as well as the object
     // branch. Resolve it before the split so every branch below reads the same
@@ -331,14 +350,17 @@ pub(crate) fn current_cursor_feedback_kind(state: &AppState) -> Option<CursorFee
         );
         return Some(promote_attack_move_feedback(
             kind,
-            modifier == super::context_order::OrderModifier::AttackMove
-                || state.match_state.input.queued_order_mode
-                    == crate::app::types::OrderMode::AttackMove,
+            show_attack_move
+                && (modifier == super::context_order::OrderModifier::AttackMove
+                    || state.match_state.input.queued_order_mode
+                        == crate::app::types::OrderMode::AttackMove),
         ));
     }
 
-    let attack_move = modifier == super::context_order::OrderModifier::AttackMove
-        || state.match_state.input.queued_order_mode == crate::app::types::OrderMode::AttackMove;
+    let attack_move = show_attack_move
+        && (modifier == super::context_order::OrderModifier::AttackMove
+            || state.match_state.input.queued_order_mode
+                == crate::app::types::OrderMode::AttackMove);
     // Shift, Alt and Ctrl+Alt over a Terrain object take the object's key
     // rungs ([`super::context_order::object_key_action`]).
     if let Some(HoverObject::Terrain(terrain_id)) = hover_object
@@ -815,9 +837,11 @@ pub(super) fn capability_cursor_for_hover(
                     CursorFeedbackKind::EngineerDamage
                 }
                 crate::sim::world::EngineerBuildingAction::Capture
-                | crate::sim::world::EngineerBuildingAction::EnterHospital
-                | crate::sim::world::EngineerBuildingAction::EnterGrinder => {
+                | crate::sim::world::EngineerBuildingAction::EnterHospital => {
                     CursorFeedbackKind::Enter
+                }
+                crate::sim::world::EngineerBuildingAction::EnterGrinder => {
+                    CursorFeedbackKind::Grind
                 }
             };
         }
@@ -848,8 +872,8 @@ pub(super) fn capability_cursor_for_hover(
         {
             return match action {
                 crate::sim::world::EntryClickAction::NoEnter => CursorFeedbackKind::NoEnter,
-                crate::sim::world::EntryClickAction::Grind
-                | crate::sim::world::EntryClickAction::Enter => CursorFeedbackKind::Enter,
+                crate::sim::world::EntryClickAction::Grind => CursorFeedbackKind::Grind,
+                crate::sim::world::EntryClickAction::Enter => CursorFeedbackKind::Enter,
             };
         }
 
@@ -1149,9 +1173,8 @@ fn infantry_weapon_feedback(
     Some(
         match super::context_order::infantry_attack_action(sim, rules?, actor_id, target_id)? {
             InfantryAttackAction::Attack => base,
-            InfantryAttackAction::Sabotage | InfantryAttackAction::WeaponDemolish => {
-                CursorFeedbackKind::Demolish
-            }
+            InfantryAttackAction::Sabotage => CursorFeedbackKind::Demolish,
+            InfantryAttackAction::WeaponDemolish => CursorFeedbackKind::WeaponDemolish,
             InfantryAttackAction::AirStrike => CursorFeedbackKind::AirStrike,
             InfantryAttackAction::Select => CursorFeedbackKind::Select,
             InfantryAttackAction::Infiltrate => CursorFeedbackKind::Enter,
@@ -1247,7 +1270,7 @@ fn ivan_attack_feedback(
     // [`super::context_order::ivan_bomb_refused`]): IvanBomb, or NoIvanBomb
     // (NoMove's row).
     if refused() {
-        CursorFeedbackKind::Invalid
+        CursorFeedbackKind::NoIvanBomb
     } else {
         CursorFeedbackKind::IvanBomb
     }
@@ -1465,7 +1488,7 @@ pub(crate) fn cursor_id_for_feedback(kind: CursorFeedbackKind) -> Option<CursorI
         CursorFeedbackKind::EnemyOutOfRange | CursorFeedbackKind::Harvest => {
             Some(CursorId::AttackOutOfRange)
         }
-        CursorFeedbackKind::Invalid => Some(CursorId::NoMove),
+        CursorFeedbackKind::Invalid | CursorFeedbackKind::NoIvanBomb => Some(CursorId::NoMove),
         CursorFeedbackKind::PlaceValid | CursorFeedbackKind::PlaceInvalid => None,
         CursorFeedbackKind::Scroll(dir) => Some(scroll_dir_to_cursor_id(dir)),
         CursorFeedbackKind::ScrollBlocked(dir) => Some(blocked_scroll_dir_to_cursor_id(dir)),
@@ -1479,7 +1502,7 @@ pub(crate) fn cursor_id_for_feedback(kind: CursorFeedbackKind) -> Option<CursorI
         // mini by default, the move cluster for a drag or queued move order,
         // and the superweapon targeting minis while one is armed.
         CursorFeedbackKind::Minimap(id) => Some(id),
-        CursorFeedbackKind::Enter => Some(CursorId::Enter),
+        CursorFeedbackKind::Enter | CursorFeedbackKind::Grind => Some(CursorId::Enter),
         CursorFeedbackKind::NoEnter => Some(CursorId::NoEnter),
         CursorFeedbackKind::EngineerDamage => Some(CursorId::EngineerRepair),
         CursorFeedbackKind::RepairAction(valid) => Some(if valid {
@@ -1487,11 +1510,13 @@ pub(crate) fn cursor_id_for_feedback(kind: CursorFeedbackKind) -> Option<CursorI
         } else {
             CursorId::NoRepair
         }),
-        CursorFeedbackKind::Demolish => Some(CursorId::Demolish),
+        CursorFeedbackKind::Demolish | CursorFeedbackKind::WeaponDemolish => {
+            Some(CursorId::Demolish)
+        }
         CursorFeedbackKind::AirStrike => Some(CursorId::AirStrike),
         // `DisplayClass::SetCursorFromAction @ 0x004AAE90`: action 0x35 ->
-        // row 0x26, action 0x39 -> row 0x3B (action 0x36 NoIvanBomb shares
-        // NoMove's row 0x13, so it is `Invalid`).
+        // row 0x26, action 0x39 -> row 0x3B. NoIvanBomb (0x36) shares
+        // NoMove's row 0x13 but retains its distinct input action.
         CursorFeedbackKind::IvanBomb => Some(CursorId::IvanBomb),
         CursorFeedbackKind::DisarmBomb => Some(CursorId::Disarm),
         CursorFeedbackKind::Deploy => Some(CursorId::Deploy),
@@ -1696,8 +1721,6 @@ pub(crate) fn super_weapon_cursor_id(action: &str) -> Option<CursorId> {
     }
 }
 
-/// Apply the player's chosen cursor-confinement state to the window.
-///
 /// The radar's cursor for the current state: a mini frame set, never the
 /// tactical main set. `0x006539D0` dispatches the armed superweapon mode
 /// (`0x008809A0`) to the same actions the tactical switch uses — mode 0 ->
@@ -1706,13 +1729,8 @@ pub(crate) fn super_weapon_cursor_id(action: &str) -> Option<CursorId> {
 /// 11 -> PsychicReveal — so the mini switch picks the targeting row's mini
 /// set where it has one.
 ///
-/// Without a superweapon the answer splits on the selection, not on the
-/// button state: with units selected the radar's action is the move order —
-/// the mini switch's action 1 lands on row 18 (frames 42-51) — and with an
-/// empty selection it falls to row 0, the plain arrow mini (frame 1), because
-/// a view-recentering click issues no order. The RadarClass handler recomputes
-/// the action per event from the selection and the superweapon mode, so
-/// hovering and dragging share one cursor.
+/// Without a superweapon, `0x00653C6A..0x00653CA1` resolves the selected
+/// object's action against the retained radar object or the raw radar cell.
 fn minimap_cursor_feedback(state: &AppState) -> CursorFeedbackKind {
     if let Some(section) = state.armed_super_weapon_type() {
         let id = state
@@ -1723,18 +1741,56 @@ fn minimap_cursor_feedback(state: &AppState) -> CursorFeedbackKind {
             .unwrap_or(CursorId::Default);
         return CursorFeedbackKind::Minimap(minimap_cursor_id_for_super_weapon(id));
     }
-    if minimap_has_selection(state) {
-        return CursorFeedbackKind::Minimap(CursorId::MinimapMove);
+    let target = crate::app::presentation::sidebar_render::minimap_input_target(state);
+    let mut feedback = target
+        .map(|target| minimap_action_feedback(state, target))
+        .unwrap_or(CursorFeedbackKind::Default);
+    let shrouded = target.is_some_and(|target| {
+        state.match_state.sim_runtime.as_ref().is_some_and(|rt| {
+            rt.simulation
+                .session()
+                .current_house()
+                .is_some_and(|owner| {
+                    rt.simulation.clicked_cell_is_shrouded(owner, target.cell) == Ok(true)
+                })
+        })
+    });
+    if shrouded
+        && feedback == CursorFeedbackKind::Invalid
+        && let Some(rt) = state.match_state.sim_runtime.as_ref()
+        && crate::app::input::dispatch::selected_stable_ids_in_order(
+            Some(&rt.simulation),
+            state.rules(),
+            &state.match_state.input.selection_order,
+            state.match_state.input.selection_order_pending,
+        )
+        .first()
+        .and_then(|id| rt.simulation.entities().get(*id))
+        .and_then(|entity| {
+            rt.simulation
+                .interner()
+                .object_type(entity.type_ref(), &rt.resources.rules)
+        })
+        .is_some_and(|object| object.move_to_shroud)
+    {
+        // Display4AB3EC checks the first selected type's MoveToShroud,
+        // independently of the action owner's ordinary NoMove answer.
+        feedback = CursorFeedbackKind::Move;
     }
-    CursorFeedbackKind::Minimap(CursorId::DefaultMini)
+    CursorFeedbackKind::Minimap(minimap_cursor_for_action(feedback, shrouded))
 }
 
-/// Whether anything is selected — the gate that splits the radar's move
-/// cluster (row 18's mini set, frames 42-51) from its plain arrow (row 0's
-/// mini set, frame 1). Same resolution the tactical path uses, so a pending
-/// or ledger-admitted selection counts.
-fn minimap_has_selection(state: &AppState) -> bool {
-    !crate::app::input::dispatch::selected_stable_ids_in_order(
+/// Radar653C6A uses the same selected-object What_Action owners as the
+/// tactical cursor, with the radar pick instead of a tactical geometric pick.
+pub(crate) fn minimap_action_feedback(
+    state: &AppState,
+    target: crate::render::radar::NativeRadarInputTarget,
+) -> CursorFeedbackKind {
+    let Some(runtime) = state.match_state.sim_runtime.as_ref() else {
+        return CursorFeedbackKind::Default;
+    };
+    let sim = &runtime.simulation;
+    let selected = crate::app::input::dispatch::selected_stable_ids_in_order(
         state
             .match_state
             .sim_runtime
@@ -1743,8 +1799,92 @@ fn minimap_has_selection(state: &AppState) -> bool {
         state.rules(),
         &state.match_state.input.selection_order,
         state.match_state.input.selection_order_pending,
+    );
+    if selected.is_empty()
+        || (state.match_state.input.planning.active()
+            && sim.planning_selection_refusal(&selected).is_some())
+    {
+        // Radar653B91 skips What_Action without a selection. PlanMgr639DA0
+        // silently drops actions for a selection that cannot use waypoints.
+        return CursorFeedbackKind::Default;
+    }
+    let owner = preferred_local_owner_name(state).unwrap_or_default();
+    let hover_object = target
+        .tracker_hit
+        .and_then(|id| crate::app::input::entity_pick::hover_object_by_id(sim, id, &owner));
+    let mut modifier = super::context_order::resolve_order_modifiers(
+        super::dispatch::is_ctrl_held(state),
+        super::dispatch::is_shift_held(state),
+        super::dispatch::is_alt_held(state),
+    );
+    let force_move_key = super::dispatch::is_alt_held(state);
+    if modifier == super::context_order::OrderModifier::AttackMove
+        && !super::context_order::selection_can_attack_move(sim, state.rules(), &selected)
+    {
+        modifier = if force_move_key {
+            super::context_order::OrderModifier::ForceMove
+        } else {
+            super::context_order::OrderModifier::Normal
+        };
+    }
+    selected_target_feedback(
+        state,
+        sim,
+        sim.interner().get(&owner),
+        &selected,
+        hover_object,
+        target.cell,
+        modifier,
+        force_move_key,
+        false,
     )
-    .is_empty()
+    .unwrap_or(CursorFeedbackKind::Default)
+}
+/// Radar's keep table at653F04 excludes Select/ToggleSelect, deployment,
+/// repair and other tactical-only actions before either cursor or release.
+pub(crate) fn minimap_action_is_admitted(feedback: CursorFeedbackKind) -> bool {
+    matches!(
+        feedback,
+        CursorFeedbackKind::Move
+            | CursorFeedbackKind::AttackMove
+            | CursorFeedbackKind::Invalid
+            | CursorFeedbackKind::Enter
+            | CursorFeedbackKind::EnemyUnit
+            | CursorFeedbackKind::EnemyStructure
+            | CursorFeedbackKind::EnemyOutOfRange
+            | CursorFeedbackKind::Harvest
+            | CursorFeedbackKind::Demolish
+            | CursorFeedbackKind::GuardArea
+    )
+}
+
+fn minimap_cursor_for_action(feedback: CursorFeedbackKind, shrouded: bool) -> CursorId {
+    match feedback {
+        CursorFeedbackKind::Harvest | CursorFeedbackKind::Enter | CursorFeedbackKind::Demolish
+            if shrouded =>
+        {
+            CursorId::DefaultMini
+        }
+        CursorFeedbackKind::Move | CursorFeedbackKind::AttackMove => CursorId::MinimapMove,
+        CursorFeedbackKind::EnemyUnit
+        | CursorFeedbackKind::EnemyStructure
+        | CursorFeedbackKind::EnemyOutOfRange
+            if shrouded =>
+        {
+            CursorId::MinimapMove
+        }
+        CursorFeedbackKind::EnemyUnit
+        | CursorFeedbackKind::EnemyStructure
+        | CursorFeedbackKind::EnemyOutOfRange => CursorId::MinimapAttack,
+        CursorFeedbackKind::Invalid => CursorId::MinimapNoMove,
+        CursorFeedbackKind::Harvest => CursorId::MinimapAttack,
+        CursorFeedbackKind::Enter => CursorId::MinimapEnter,
+        CursorFeedbackKind::Demolish => CursorId::Demolish,
+        // Action26 calls731CC0 (row22) in both normal and shroud switches
+        // (4AB4D9 /4AB3A1), forwarding mini=1.
+        CursorFeedbackKind::GuardArea => CursorId::MinimapGuardArea,
+        _ => CursorId::DefaultMini,
+    }
 }
 
 /// Map a tactical superweapon cursor row to its radar mini set. Rows 53
@@ -2030,6 +2170,71 @@ mod tests {
     use crate::rules::ini_parser::IniFile;
     use crate::rules::ruleset::RuleSet;
     use crate::sim::world::Simulation;
+
+    #[test]
+    fn radar_keeps_input_actions_distinct_from_shared_cursor_art() {
+        // Radar653F04 admits NoMove2 but drops NoIvanBomb54, although both
+        // use cursor row19. It also drops selection/deployment/repair actions.
+        let refused_ivan =
+            super::ivan_attack_feedback(CursorFeedbackKind::EnemyUnit, true, || true);
+        assert_eq!(
+            super::cursor_id_for_feedback(refused_ivan),
+            Some(CursorId::NoMove)
+        );
+        assert!(!super::minimap_action_is_admitted(refused_ivan));
+        assert!(super::minimap_action_is_admitted(
+            CursorFeedbackKind::Invalid
+        ));
+        for feedback in [
+            CursorFeedbackKind::Select,
+            CursorFeedbackKind::Deploy,
+            CursorFeedbackKind::RepairAction(true),
+            CursorFeedbackKind::IvanBomb,
+            CursorFeedbackKind::Grind,
+            CursorFeedbackKind::NoEnter,
+            CursorFeedbackKind::WeaponDemolish,
+        ] {
+            assert!(!super::minimap_action_is_admitted(feedback));
+            assert_eq!(
+                super::minimap_cursor_for_action(feedback, false),
+                CursorId::DefaultMini
+            );
+        }
+        // Display4AB4EE..4AB54B uses normal attack rows on revealed cells;
+        // shroud branch4AB35A instead sends Attack5 to the Move mini row.
+        for feedback in [
+            CursorFeedbackKind::EnemyUnit,
+            CursorFeedbackKind::EnemyOutOfRange,
+        ] {
+            assert_eq!(
+                super::minimap_cursor_for_action(feedback, false),
+                CursorId::MinimapAttack
+            );
+            assert_eq!(
+                super::minimap_cursor_for_action(feedback, true),
+                CursorId::MinimapMove
+            );
+        }
+        assert!(super::minimap_action_is_admitted(
+            CursorFeedbackKind::GuardArea
+        ));
+        for shrouded in [false, true] {
+            assert_eq!(
+                super::minimap_cursor_for_action(CursorFeedbackKind::GuardArea, shrouded),
+                CursorId::MinimapGuardArea
+            );
+        }
+        for feedback in [
+            CursorFeedbackKind::Harvest,
+            CursorFeedbackKind::Enter,
+            CursorFeedbackKind::Demolish,
+        ] {
+            assert_eq!(
+                super::minimap_cursor_for_action(feedback, true),
+                CursorId::DefaultMini
+            );
+        }
+    }
 
     fn cursor_contract_rules() -> RuleSet {
         let ini = IniFile::from_str(

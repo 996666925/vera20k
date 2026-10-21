@@ -907,6 +907,12 @@ impl Simulation {
                 .planning_invalid_node_reason(selected, node)
                 .map(|_| PlanningPressRefusal::InvalidNode);
         }
+        self.planning_selection_refusal(selected)
+    }
+
+    /// PlanMgr639DA0's selection-only check, also used directly by radar
+    /// input653CD1 without a tactical node hit test or refusal message.
+    pub fn planning_selection_refusal(&self, selected: &[u64]) -> Option<PlanningPressRefusal> {
         selected.iter().find_map(|&id| {
             match self
                 .substrate

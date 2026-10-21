@@ -1664,6 +1664,10 @@ fn press_refusals_and_hover_follow_the_selected_paths() {
     assert!(!sim.planning_release_refused(&[1], first));
     // A node hit skips 639DA0, so an aircraft without a token passes.
     assert_eq!(sim.planning_press_refusal(&[4, 5], first), None);
+    // Radar653CD1 calls639DA0 directly: even a tactical node that admits
+    // this selection cannot bypass the radar's selection-only check.
+    assert_eq!(sim.planning_selection_refusal(&[4, 5]), Some(NoAircraft));
+    assert_eq!(sim.planning_selection_refusal(&[1, 3]), None);
 
     // 639DA0 with no node hit: the first object that cannot use waypoints.
     let open = [first[0] + 200, first[1] + 200];

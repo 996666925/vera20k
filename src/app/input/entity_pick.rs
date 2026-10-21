@@ -152,6 +152,16 @@ pub(crate) fn hover_object_at_point(
         CellObjectMember::Entity(id) => id,
         CellObjectMember::Terrain(id) => return Some(HoverObject::Terrain(id)),
     };
+    hover_object_by_id(sim, stable_id, local_owner)
+}
+
+/// Classify an identity already picked by a retained input source (radar or
+/// tactical). Do not perform another geometric pick at its coordinates.
+pub(crate) fn hover_object_by_id(
+    sim: &crate::sim::world::Simulation,
+    stable_id: u64,
+    local_owner: &str,
+) -> Option<HoverObject> {
     let entity = sim.entities().get(stable_id)?;
     let is_structure = entity.category() == EntityCategory::Structure;
     // What_Action asks the actor's house, here the local player's

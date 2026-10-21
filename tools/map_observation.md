@@ -1204,6 +1204,16 @@ The existing local-key gesture policy carries that projection even without a key
 A moving tracker hit follows its object's virtual+4C navigation coordinate before
 the radar's signed clamp, Cell ground center and immediate camera update.
 
+[`map_observation.radar-orders.example.json`](map_observation.radar-orders.example.json)
+builds a Soviet radar and conscript on stock XMP03T4 through ordinary production.
+It clicks the minimap before selection, selects the conscript, clicks a different
+minimap position, then holds Z for two more clicks and releases it. Inspect the
+gesture receipts for the camera-only first click, the selected unit's Move command
+with an unchanged camera, and two PlanningRecord commands followed by the release
+commit. The final planning path should retain two nodes with editing disabled.
+These are Rust production-input observations; they do not establish whole-run
+native equivalence.
+
 ## Literal keyboard gestures
 
 A v2 profile can send a literal key press and release through the same in-game

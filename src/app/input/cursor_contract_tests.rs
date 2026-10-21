@@ -205,6 +205,13 @@ fn retail_weapon_cursor_overrides_survive_distance() {
                 Some(expected),
                 "{actor_type} -> {target_type} x={x}"
             );
+            // Native radar653F04 keeps C4's16, but excludes the weapon
+            // override64 (retail Tanya/Sapper on a tank) and Boris's71.
+            assert_eq!(
+                super::minimap_action_is_admitted(feedback),
+                actor_type == "TANY" && target_type == "NAPOWR",
+                "radar admission: {actor_type} -> {target_type} x={x}"
+            );
             assert_eq!(
                 sim.state_hash(),
                 before,
