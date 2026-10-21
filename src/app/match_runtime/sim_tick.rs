@@ -1257,7 +1257,10 @@ fn advance_one_simulation_frame(
                 .combat_lights
                 .commit_frame(drained_combat_lights);
         }
-        crate::app::input::dispatch::reconcile_selection_order_after_sim(state);
+        crate::app::input::dispatch::reconcile_selection_order_after_sim(
+            state,
+            &drained_lifecycle_outputs,
+        );
         // Trigger Focus/lock effects precede TacticalAI in this Logic visit.
         // Coordinates were resolved by simulation before its final hash.
         apply_trigger_effects(state, &trigger_effects);
@@ -1333,7 +1336,8 @@ fn advance_one_simulation_frame(
                 | LifecycleOutput::BuildingPlacementRetry { .. }
                 | LifecycleOutput::BuildingPlacementSucceeded { .. }
                 | LifecycleOutput::BuildingProductionAbandoned { .. }
-                | LifecycleOutput::FollowReleased { .. } => {}
+                | LifecycleOutput::FollowReleased { .. }
+                | LifecycleOutput::ObjectSelected { .. } => {}
                 LifecycleOutput::ObjectPointerExpired { stable_id } => {
                     state
                         .match_state

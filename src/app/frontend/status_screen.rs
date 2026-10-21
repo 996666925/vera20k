@@ -23,8 +23,9 @@ use crate::render::status_font::StrokeFace;
 use crate::ui::pause_menu::{InGameMenuState, ModalOutcome};
 use crate::ui::shell::geom::RectPx;
 
-/// Bottom-right identity line. Not a retail build string.
-const BUILD_STAMP: &str = concat!("VERA20K ", env!("CARGO_PKG_VERSION"));
+/// Identity line: the bottom-right status screen and the dashboard's header
+/// share this one stamp. Not a retail build string.
+pub(crate) const BUILD_STAMP: &str = concat!("VERA20K ", env!("CARGO_PKG_VERSION"));
 
 #[derive(Clone, Copy)]
 enum Action {

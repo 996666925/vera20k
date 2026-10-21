@@ -1657,7 +1657,11 @@ fn emit_building_anims(
             (
                 tint,
                 crate::app::presentation::lighting::anim_palette_light(
-                    light_grid, cell, config, false,
+                    light_grid,
+                    cell,
+                    config,
+                    false,
+                    instance.remap().as_ref(),
                 ),
             )
         };
