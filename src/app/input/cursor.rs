@@ -1706,17 +1706,32 @@ fn cursor_animation_start() -> &'static Instant {
 }
 
 pub(crate) fn current_sidebar_view_hit(state: &AppState) -> bool {
-    let (x, _, w, h) = state.sidebar_frame().column();
+    sidebar_view_hit(
+        state.sidebar_frame(),
+        state.match_state.input.cursor_x,
+        state.match_state.input.cursor_y,
+    )
+}
+
+fn sidebar_view_hit(frame: crate::ui::sidebar::SidebarFrame, cursor_x: f32, cursor_y: f32) -> bool {
+    // The bottom command-bar surface owns its spacer and unused slots too,
+    // even when the bar is closed (#2627). Reuse its frame-space bounds so
+    // world cursor queries stop at the same boundary as drawing and clicks.
+    let (x, y, w, h) = frame.strip();
+    let strip_rect = crate::ui::sidebar::Rect {
+        x: x as f32,
+        y: y as f32,
+        w: w as f32,
+        h: h as f32,
+    };
+    let (x, _, w, h) = frame.column();
     let panel_rect = crate::ui::sidebar::Rect {
         x: x as f32 - 10.0,
         y: 10.0,
         w: w as f32,
         h: h as f32 - 20.0,
     };
-    panel_rect.contains(
-        state.match_state.input.cursor_x,
-        state.match_state.input.cursor_y,
-    )
+    strip_rect.contains(cursor_x, cursor_y) || panel_rect.contains(cursor_x, cursor_y)
 }
 
 /// Map a SuperWeaponType `Action=` INI string to its targeting cursor.
@@ -2010,6 +2025,27 @@ mod tests {
     use crate::rules::ini_parser::IniFile;
     use crate::rules::ruleset::RuleSet;
     use crate::sim::world::Simulation;
+
+    #[test]
+    fn command_bar_blocks_world_cursor_across_the_whole_strip() {
+        let frame = crate::ui::sidebar::SidebarFrame::native(800, 600);
+        // Both open and closed bars retain the bottom surface, including the
+        // spacer and unused command slots, not just the live button gadgets.
+        assert!(super::sidebar_view_hit(frame, 1.0, 568.0));
+        assert!(super::sidebar_view_hit(frame, 300.0, 580.0));
+        assert!(super::sidebar_view_hit(frame, 580.0, 599.0));
+        assert!(!super::sidebar_view_hit(frame, 300.0, 567.0));
+        assert!(!super::sidebar_view_hit(frame, 300.0, 600.0));
+    }
+
+    #[test]
+    fn command_bar_cursor_boundary_tracks_sidebar_scale() {
+        let frame = crate::ui::sidebar::SidebarFrame::new(1280, 720, 150);
+        assert!(super::sidebar_view_hit(frame, 300.0, 672.0));
+        assert!(!super::sidebar_view_hit(frame, 300.0, 671.0));
+        assert!(super::sidebar_view_hit(frame, 300.0, 719.0));
+        assert!(!super::sidebar_view_hit(frame, 300.0, 720.0));
+    }
 
     /// NoIvanBomb (0x36) draws NoMove's row 19 but stays its own action,
     /// which the radar's keep table drops ([`crate::app::input::radar`]).
