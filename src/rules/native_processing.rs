@@ -5078,6 +5078,19 @@ impl RulesPassProcessor {
                         self.families.get_mut(&family).unwrap()[index]
                             .secret_lab
                             .read_flag(&raw);
+                        // BuildingTypeClass::ReadINI @0x00460DEB..0x00460E10:
+                        // current-default InvisibleInGame forces Invisible+0xC9A
+                        // and clears RadarVisible+0xC9B after the Techno reads.
+                        // Keep these writes in the retained body so absent or
+                        // invalid keys in later passes use the derived defaults.
+                        // Source: tools.native_inspect disasm 0x460DEB --bytes 0x2C.
+                        let body = &mut self.family_mut(family)[index].body;
+                        if body.read_bool("InvisibleInGame", false) {
+                            let mut derived = IniSection::new(native_stored_id.clone());
+                            derived.set("Invisible", "yes");
+                            derived.set("RadarVisible", "no");
+                            body.overlay_rules_pass(&derived);
+                        }
                         // ToOverlay's ART section is +1F8 (0x004610DE).
                         if let Some(overlay) = self.resolve_fixed_art_reference(
                             fixed_art,

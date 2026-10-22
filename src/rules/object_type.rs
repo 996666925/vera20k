@@ -1804,12 +1804,14 @@ pub struct ObjectType {
     /// false; only eligible buildings can convert a fatal result to PostMortem.
     pub eligible_for_delay_kill: bool,
 
-    /// `Invisible=yes` on BuildingType. Live building rejection checks this
-    /// plain invisible byte separately from `InvisibleInGame`.
+    /// TechnoType+0xC9A `Invisible=`. BuildingType ReadINI460E09 also forces
+    /// it true while InvisibleInGame is set; the ordered Rules owner retains
+    /// that write across layers. Live rejection can test both bytes separately.
     pub invisible: bool,
 
     /// `InvisibleInGame=yes` on BuildingType. Logical-only buildings (e.g., bridge
     /// anchors) that should not receive C4 or other interaction cursors.
+    /// ReadINI460E09/460E10 also forces Invisible=true and RadarVisible=false.
     pub invisible_in_game: bool,
     /// BuildingType+0x1703, the immediate placement admission read by
     /// 0x464AC0; the constructor clears it at 0x45E212 and ReadINI
@@ -3761,6 +3763,54 @@ mod absorber_pip_tests;
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn invisible_in_game_forces_building_flags_and_retains_them_across_layers() {
+        use crate::rules::ini_parser::IniFile;
+        use crate::rules::native_processing::{RulesLayerKind, RulesLayerStack};
+        use crate::rules::ruleset::RuleSet;
+
+        let mut layers = RulesLayerStack::new(IniFile::from_str(
+            "[BuildingTypes]\n0=HIDDEN\n[VehicleTypes]\n0=VISIBLE\n\
+             [HIDDEN]\nInvisible=no\nInvisibleInGame=yes\nRadarVisible=yes\n\
+             [VISIBLE]\nInvisible=no\nInvisibleInGame=yes\nRadarVisible=yes\n",
+        ));
+        let flags = |layers: &RulesLayerStack, name: &str| {
+            let rules = RuleSet::from_rules_layers(layers).unwrap();
+            let object = rules.object(name).unwrap();
+            (
+                object.invisible_in_game,
+                object.invisible,
+                object.radar_visible,
+            )
+        };
+        assert_eq!(flags(&layers, "HIDDEN"), (true, true, false));
+        assert_eq!(flags(&layers, "VISIBLE"), (true, false, true));
+
+        // Clearing the building-only key does not undo earlier derived writes.
+        // Invalid base-reader values retain those writes as their defaults.
+        layers.push(
+            RulesLayerKind::GameMode,
+            IniFile::from_str(
+                "[HIDDEN]\nInvisibleInGame=no\nInvisible=invalid\nRadarVisible=invalid\n",
+            ),
+        );
+        assert_eq!(flags(&layers, "HIDDEN"), (false, true, false));
+        layers.push(
+            RulesLayerKind::Scenario,
+            IniFile::from_str("[HIDDEN]\nInvisible=no\nRadarVisible=yes\n"),
+        );
+        assert_eq!(flags(&layers, "HIDDEN"), (false, false, true));
+
+        let Some(retail) =
+            crate::rules::retail_ini_fixture::retail_battle_rules_for_map("XMP03T4.MAP")
+        else {
+            return;
+        };
+        let lamp = retail.rules.object("INGALITE").unwrap();
+        assert!(lamp.invisible_in_game && lamp.invisible);
+        assert!(!lamp.radar_visible);
+    }
+
     /// `RevealToAll=` through the production reader on the retail layers.
     #[test]
     #[ignore = "slow; run when changing what it covers"]
