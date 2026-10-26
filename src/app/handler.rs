@@ -1623,16 +1623,13 @@ impl ApplicationHandler for App {
                     && !crate::app::input::campaign_input::is_locked(state)
                 {
                     // Optional player setting: over the battlefield the wheel changes the view
-                    // distance tier, anchored on the cursor's map point. Over the
+                    // distance tier, anchored on the tactical centre. Over the
                     // sidebar and the bottom strip it keeps gamemd's native
                     // SidebarUp/SidebarDown routing.
                     if state.persistence.options_profile.mouse_wheel_zoom
                         && crate::app::input::camera::cursor_over_battlefield(state)
                     {
-                        crate::app::input::camera::cycle_view_distance(
-                            &mut state.match_state.input,
-                            lines,
-                        );
+                        crate::app::input::camera::cycle_view_distance(state, lines);
                         state.platform.window.request_redraw();
                         return;
                     }

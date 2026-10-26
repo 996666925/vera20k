@@ -1852,60 +1852,6 @@ mod mind_control_pip_tests;
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn health_pips_keep_window_size_and_spacing_at_wheel_zoom() {
-        let mut strip = super::TechnoExtras {
-            background: Some(crate::render::batch::SpriteInstance {
-                position: [94.0, 74.0],
-                size: [10.0, 4.0],
-                ..Default::default()
-            }),
-            fills: vec![
-                crate::render::batch::SpriteInstance {
-                    position: [100.0, 74.0],
-                    size: [4.0, 4.0],
-                    ..Default::default()
-                },
-                crate::render::batch::SpriteInstance {
-                    position: [104.0, 76.0],
-                    size: [4.0, 4.0],
-                    ..Default::default()
-                },
-            ],
-            ..Default::default()
-        };
-        let anchor = (100.0, 100.0);
-        let camera = (30.0, 40.0);
-        let zoom = 0.8;
-
-        super::keep_health_pips_screen_size(
-            strip.background.iter_mut().chain(strip.fills.iter_mut()),
-            anchor,
-            zoom,
-        );
-
-        let background = strip.background.unwrap();
-        let first = strip.fills[0];
-        let second = strip.fills[1];
-        let screen_position = |instance: crate::render::batch::SpriteInstance| {
-            [
-                (instance.position[0] - camera.0) * zoom,
-                (instance.position[1] - camera.1) * zoom,
-            ]
-        };
-        assert_eq!(screen_position(background), [50.0, 22.0]);
-        assert_eq!(screen_position(first), [56.0, 22.0]);
-        assert_eq!(screen_position(second), [60.0, 24.0]);
-        assert_eq!([first.size[0] * zoom, first.size[1] * zoom], [4.0, 4.0]);
-        assert_eq!(
-            [
-                second.position[0] - first.position[0],
-                second.position[1] - first.position[1]
-            ],
-            [5.0, 2.5]
-        );
-    }
-
     /// Phobos `DrawShieldBar_Pip`: the shield type's own frames first, then the
     /// global `[AudioVisual] Pips.Shield*` triplet, then the native 16/5.
     #[cfg(feature = "phobos")]

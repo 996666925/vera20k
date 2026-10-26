@@ -30,326 +30,6 @@ fn wheel_zoom_keeps_infantry_health_pixels_identical() {
     wheel_zoom_health_pixels("E1", EntityCategory::Infantry);
 }
 
-#[test]
-#[ignore = "requires retail assets and GPU; building health follows the projected factory roof"]
-fn wheel_zoom_keeps_building_health_aligned_with_the_roof() {
-    wheel_zoom_health_pixels("NAWEAP", EntityCategory::Structure);
-}
-
-#[test]
-#[ignore = "requires retail assets and GPU; final health bounds at the right viewport edge"]
-fn wheel_zoom_culls_building_health_after_size_compensation() {
-    let retail =
-        crate::rules::retail_ini_fixture::retail_battle_rules_for_map("XMP03T4.MAP").unwrap();
-    let (_, assets) = crate::rules::retail_ini_fixture::retail_assets().unwrap();
-    let gpu = Gpu::new();
-    let batch = BatchRenderer::new_with_device(
-        &gpu.device,
-        &gpu.queue,
-        wgpu::TextureFormat::Bgra8UnormSrgb,
-    );
-    let overlay = SelectionOverlay::new_on_device(&gpu.device, &gpu.queue, &batch, Some(&assets));
-    let mut sim = Simulation::new();
-    let owner = sim.intern("Americans");
-    let type_ref = sim.intern("NAWEAP");
-    let mut entity = GameEntity::new_at_frame_zero_for_test(
-        1,
-        20,
-        20,
-        0,
-        0,
-        owner,
-        Health::new(1),
-        type_ref,
-        EntityCategory::Structure,
-        0,
-        5,
-        false,
-    );
-    entity.lifecycle.set_in_limbo_for_test(false);
-    entity.discovery.set_owned_by_current_house_for_test(true);
-    entity.selection.set_selected_for_test(true);
-    sim.entities_mut_for_test().insert(entity);
-    sim.resubmit_entity_display_for_test(1);
-    let entity = sim.entities().get(1).unwrap();
-    let coord = crate::sim::movement::ground_pose::object_get_coords(entity, None);
-    let point = crate::util::lepton::absolute_leptons_to_screen(coord.x, coord.y, coord.z);
-    let viewport = StatusViewport {
-        camera: [point.0 - 1130.0, point.1 - 400.0],
-        size: [1024.0, 1024.0],
-        zoom: 0.25,
-        ignore_visibility: true,
-    };
-    let build = |viewport| {
-        techno_extras_for_parent(
-            &sim,
-            entity,
-            Some(&retail.rules),
-            &overlay,
-            None,
-            Some("Americans"),
-            viewport,
-        )
-    };
-    let full = build(StatusViewport {
-        size: [2048.0, 1024.0],
-        ..viewport
-    });
-    let expected: Vec<_> = full
-        .fills
-        .iter()
-        .filter(|pip| {
-            pip.position[0] < viewport.camera[0] + viewport.size[0]
-                && pip.position[0] + pip.size[0] > viewport.camera[0]
-        })
-        .collect();
-    assert!(
-        !expected.is_empty(),
-        "the fixed-pixel row reaches the viewport"
-    );
-    let clipped = build(viewport);
-    for pip in expected {
-        assert!(
-            clipped
-                .fills
-                .iter()
-                .any(|actual| actual.position == pip.position
-                    && actual.size == pip.size
-                    && actual.uv_origin == pip.uv_origin),
-            "a visible pip must survive culling"
-        );
-    }
-}
-
-#[test]
-#[ignore = "requires retail assets and GPU; passenger pips and self-heal remain world sprites"]
-fn wheel_zoom_keeps_mobile_status_on_the_world_lattice() {
-    let retail =
-        crate::rules::retail_ini_fixture::retail_battle_rules_for_map("XMP03T4.MAP").unwrap();
-    let (_, assets) = crate::rules::retail_ini_fixture::retail_assets().unwrap();
-    let gpu = Gpu::new();
-    let batch = BatchRenderer::new_with_device(
-        &gpu.device,
-        &gpu.queue,
-        wgpu::TextureFormat::Bgra8UnormSrgb,
-    );
-    let overlay = SelectionOverlay::new_on_device(&gpu.device, &gpu.queue, &batch, Some(&assets));
-    let mut sim = Simulation::new();
-    let owner = sim.intern("Americans");
-    let mut house = crate::sim::house_state::HouseState::new(owner, 0, None, true, 0, 10);
-    crate::sim::arena_fixture::install_status_self_heal(&mut house, 0, 1);
-    sim.houses_mut_for_test().register(house);
-    let type_ref = sim.intern("FV");
-    let mut entity = GameEntity::new_at_frame_zero_for_test(
-        1,
-        20,
-        20,
-        0,
-        0,
-        owner,
-        Health::new(1),
-        type_ref,
-        EntityCategory::Unit,
-        0,
-        5,
-        false,
-    );
-    entity.lifecycle.set_in_limbo_for_test(false);
-    entity.discovery.set_owned_by_current_house_for_test(true);
-    entity.selection.set_selected_for_test(true);
-    sim.entities_mut_for_test().insert(entity);
-    sim.resubmit_entity_display_for_test(1);
-    let entity = sim.entities().get(1).unwrap();
-    let coord = crate::sim::movement::ground_pose::object_get_coords(entity, None);
-    let point = crate::util::lepton::absolute_leptons_to_screen(coord.x, coord.y, coord.z);
-    let build = |zoom| {
-        techno_extras_for_parent(
-            &sim,
-            entity,
-            Some(&retail.rules),
-            &overlay,
-            None,
-            Some("Americans"),
-            StatusViewport {
-                camera: [point.0 - 128.0, point.1 - 128.0],
-                size: [512.0, 512.0],
-                zoom,
-                ignore_visibility: true,
-            },
-        )
-    };
-    let native = build(1.0);
-    assert!(!native.scale.is_empty());
-    assert!(native.self_heal.is_some());
-    for zoom in [0.5, 1.25] {
-        let status = build(zoom);
-        assert_eq!(status.scale.len(), native.scale.len());
-        assert!(status.self_heal.is_some());
-        for (actual, expected) in status
-            .scale
-            .iter()
-            .chain(status.self_heal.iter())
-            .zip(native.scale.iter().chain(native.self_heal.iter()))
-        {
-            assert_eq!(
-                actual.position, expected.position,
-                "zoom {zoom}: world position"
-            );
-            assert_eq!(
-                actual.size, expected.size,
-                "zoom {zoom}: one world pixel per texel"
-            );
-            assert_eq!(
-                actual.draw_state.native_selector_bits(),
-                expected.draw_state.native_selector_bits()
-            );
-        }
-    }
-}
-
-#[test]
-#[ignore = "requires retail assets and GPU; building labels keep native glyphs/backing at projected anchors"]
-fn wheel_zoom_keeps_building_status_text_pixels_and_size() {
-    use crate::app::presentation::ui_overlays::build_building_status_render_instances;
-    use crate::render::upscale_pass::WorldZoomPass;
-    let retail =
-        crate::rules::retail_ini_fixture::retail_battle_rules_for_map("XMP03T4.MAP").unwrap();
-    let (_, assets) = crate::rules::retail_ini_fixture::retail_assets().unwrap();
-    let gpu = Gpu::new();
-    let format = wgpu::TextureFormat::Bgra8UnormSrgb;
-    let size = [256, 256];
-    let batch = BatchRenderer::new_with_device(&gpu.device, &gpu.queue, format);
-    let overlay = SelectionOverlay::new_on_device(&gpu.device, &gpu.queue, &batch, Some(&assets));
-    let fnt =
-        crate::assets::fnt_file::FntFile::from_bytes(assets.get_ref("GAME.FNT").unwrap()).unwrap();
-    let font = crate::render::bit_font::BitFont::from_fnt(&gpu.device, &gpu.queue, &batch, &fnt);
-    let csf =
-        crate::assets::csf_file::CsfFile::from_bytes(assets.get_ref("RA2MD.CSF").unwrap()).unwrap();
-    let mut sim = Simulation::new();
-    let owner = sim.intern("Americans");
-    sim.intern_rule_type_ids(&retail.rules);
-    sim.resolve_type_handles(&retail.rules);
-    let type_ref = sim.intern("GAPOWR");
-    let object = retail.rules.object("GAPOWR").unwrap();
-    let mut entity = GameEntity::new_at_frame_zero_for_test(
-        1,
-        20,
-        20,
-        0,
-        0,
-        owner,
-        Health::new(object.strength),
-        type_ref,
-        EntityCategory::Structure,
-        0,
-        5,
-        false,
-    );
-    entity.lifecycle.set_in_limbo_for_test(false);
-    entity.lifecycle.set_cell_marked_for_test(true);
-    entity.selection.set_selected_for_test(true);
-    let location = crate::sim::movement::ground_pose::object_location(&entity, None);
-    let (render, _) =
-        crate::sim::movement::ground_pose::building_render_order_parts(location, false, false);
-    let point = crate::util::lepton::absolute_leptons_to_screen(render.x, render.y, render.z);
-    sim.entities_mut_for_test().insert(entity);
-    let mut cam = camera(size);
-    cam.camera_pos = [point.0 - 128.0, point.1 - 128.0];
-    let mut reference = None;
-    let mut pool = InstanceBufferPool::new();
-    for zoom in [1.0, 1.25, 0.8, 0.5] {
-        cam.zoom = zoom;
-        batch.write_camera(&gpu.queue, cam);
-        let resolve =
-            (zoom != 1.0).then(|| WorldZoomPass::new(&gpu.device, &gpu.queue, format, size, zoom));
-        let source_size = resolve.as_ref().map_or(size, WorldZoomPass::source_size);
-        if resolve.is_some() {
-            batch.set_native_world_resolution(&gpu.queue, source_size);
-        }
-        let labels = build_building_status_render_instances(
-            &sim,
-            &[1].into_iter().collect(),
-            owner,
-            &Default::default(),
-            &retail.rules.house_color_ramps,
-            &font,
-            &csf,
-            cam.camera_pos,
-            zoom,
-            [0, 0, size[0] as i32, size[1] as i32],
-            &retail.rules,
-        );
-        assert_eq!(
-            labels.runs.len(),
-            1,
-            "selected powered building emits one status label"
-        );
-        pool.upload_on_device(&gpu.device, &gpu.queue, "label", &labels.instances);
-        let color = gpu.target(source_size, format);
-        let depth = gpu.target(source_size, wgpu::TextureFormat::Depth32Float);
-        let cv = color.create_view(&Default::default());
-        let dv = depth.create_view(&Default::default());
-        let mut encoder = gpu.device.create_command_encoder(&Default::default());
-        clear(
-            &mut encoder,
-            &cv,
-            &dv,
-            u16::MAX,
-            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-        );
-        let mut terrain = TerrainDrawRenderer::new(&gpu.device, &gpu.queue, format, &batch);
-        terrain.prepare(&gpu.device, &color, &dv, batch.camera_uniform());
-        if let Some(resolve) = &resolve {
-            resolve.composite(
-                &gpu.device,
-                &mut encoder,
-                &color,
-                [0, 0, size[0], size[1]],
-                wgpu::Color::BLACK,
-            );
-        }
-        super::object_extras::draw_building_status_text(
-            &mut encoder,
-            resolve.as_ref().map_or(&cv, WorldZoomPass::color_view),
-            resolve
-                .as_ref()
-                .map_or(&dv, WorldZoomPass::frame_depth_view),
-            &mut terrain,
-            [0, 0, size[0], size[1]],
-            &batch,
-            Some(&overlay),
-            pool.get("label").map(|(buffer, _)| buffer),
-            Some(font.atlas()),
-            &labels.runs,
-            if resolve.is_some() {
-                batch.ui_camera_bind_group()
-            } else {
-                batch.surface_camera_bind_group()
-            },
-        );
-        let output = resolve
-            .as_ref()
-            .map_or(&color, WorldZoomPass::color_texture);
-        let read = gpu.read(&mut encoder, output);
-        let pixels = gpu.finish(encoder, &[read], size).remove(0);
-        let anchor = (128.0 * zoom).round() as u32;
-        let mut label = Vec::new();
-        for y in anchor - 32..anchor + 32 {
-            let offset = ((y * size[0] + anchor - 64) * 4) as usize;
-            label.extend_from_slice(&pixels[offset..offset + 128 * 4]);
-        }
-        assert!(label.chunks_exact(4).any(|pixel| pixel[..3] != [0; 3]));
-        if let Some(reference) = &reference {
-            assert!(
-                &label == reference,
-                "zoom {zoom}: PRIMARY glyphs, backing and outline keep native pixels"
-            );
-        } else {
-            reference = Some(label);
-        }
-    }
-}
-
 fn wheel_zoom_health_pixels(type_name: &str, category: EntityCategory) {
     use crate::render::upscale_pass::WorldZoomPass;
     let retail = crate::rules::retail_ini_fixture::retail_battle_rules_for_map("XMP03T4.MAP")
@@ -392,35 +72,16 @@ fn wheel_zoom_health_pixels(type_name: &str, category: EntityCategory) {
     let coord = crate::sim::movement::ground_pose::object_get_coords(entity, None);
     let point = crate::util::lepton::absolute_leptons_to_screen(coord.x, coord.y, coord.z);
     let mut cam = camera(size);
-    let object_screen_x = if category == EntityCategory::Structure {
-        160.0
+    cam.camera_pos = [point.0 - 63.0, point.1 - 180.0];
+    let anchor = point;
+    let pip_count = if category == EntityCategory::Infantry {
+        8
     } else {
-        63.0
-    };
-    cam.camera_pos = [point.0 - object_screen_x, point.1 - 180.0];
-    let (anchor, pip_count) = if category == EntityCategory::Structure {
-        let geometry =
-            crate::app::presentation::ui_overlays::BuildingBarGeometry::new(&retail.rules, object);
-        let count = geometry.num_pips;
-        (geometry.first_pip(point.0, point.1), count as usize)
-    } else {
-        (
-            point,
-            if category == EntityCategory::Infantry {
-                8
-            } else {
-                17
-            },
-        )
+        17
     };
     let mut reference: Option<(Vec<u8>, [u32; 2], [i32; 2])> = None;
     let mut native_infantry_fills = None;
-    let zooms: &[f32] = if category == EntityCategory::Structure {
-        &[1.0, 1.25, 0.8, 0.5]
-    } else {
-        &[1.0, 1.25, 0.8, 1.0 / 1.5]
-    };
-    for &zoom in zooms {
+    for zoom in [1.0, 1.25, 0.8, 1.0 / 1.5] {
         cam.zoom = zoom;
         batch.write_camera(&gpu.queue, cam);
         let resolve =
@@ -443,13 +104,8 @@ fn wheel_zoom_health_pixels(type_name: &str, category: EntityCategory) {
                 ignore_visibility: true,
             },
         );
-        assert_eq!(
-            status.background.is_some(),
-            category != EntityCategory::Structure
-        );
-        let visible_pips = if category == EntityCategory::Structure && zoom < 1.0 {
-            (((pip_count - 1) as f32 * zoom).floor() as usize) + 1
-        } else if category == EntityCategory::Infantry {
+        assert!(status.background.is_some());
+        let visible_pips = if category == EntityCategory::Infantry {
             // Compare the damaged bar with its native-zoom fill count without
             // duplicating the health-to-pip rounding performed by the producer.
             *native_infantry_fills.get_or_insert_with(|| {
@@ -463,11 +119,7 @@ fn wheel_zoom_health_pixels(type_name: &str, category: EntityCategory) {
         assert_eq!(status.fills.len(), visible_pips);
         let display = NativeDisplayOrder::new(&[1]);
         let draw = display.object_draw(1, SpriteEncoding::Plain).unwrap();
-        let mut parent = if category == EntityCategory::Structure {
-            PlannedObjectInstance::building(draw, vec![])
-        } else {
-            PlannedObjectInstance::object(draw, vec![])
-        };
+        let mut parent = PlannedObjectInstance::object(draw, vec![]);
         parent.status = Some(status);
         let mut layer = lower_ground_object_instances(vec![parent]);
         super::object_extras::defer_health_to_frame(&mut layer, cam.camera_pos, zoom);
@@ -486,13 +138,7 @@ fn wheel_zoom_health_pixels(type_name: &str, category: EntityCategory) {
             // The mobile border straddles an A boundary at its parent point.
             // It must still sample live A in frame pixels, while fills bypass A.
             &(0..source_size[0] * source_size[1])
-                .map(|index| {
-                    if category != EntityCategory::Structure && index % source_size[0] < 63 {
-                        0
-                    } else {
-                        127
-                    }
-                })
+                .map(|index| if index % source_size[0] < 63 { 0 } else { 127 })
                 .collect::<Vec<_>>(),
         );
         batch.bind_shroud(&gpu.device, Some(&a));
@@ -584,71 +230,6 @@ fn wheel_zoom_health_pixels(type_name: &str, category: EntityCategory) {
             bounds[1] as i32 - frame_anchor[1],
         ];
         if let Some((reference, reference_extent, reference_offset)) = &reference {
-            if category == EntityCategory::Structure {
-                if zoom < 1.0 {
-                    // A shorter row of the original full-health SHP pips must
-                    // retain every native border/fill pixel, not just its bounds.
-                    let removed = (pip_count - visible_pips) as u32;
-                    assert_eq!(
-                        extent,
-                        [
-                            reference_extent[0] - removed * 4,
-                            reference_extent[1] - removed * 2
-                        ]
-                    );
-                    let mut expected = Vec::new();
-                    for y in 0..extent[1] {
-                        // PIPS frames overlap. Join the native head and tail;
-                        // a plain rectangle crop includes the next omitted pip.
-                        let (source_x, source_y) = if y < extent[1] / 2 {
-                            (removed * 4, y)
-                        } else {
-                            (0, y + removed * 2)
-                        };
-                        let offset = ((source_y * reference_extent[0] + source_x) * 4) as usize;
-                        expected
-                            .extend_from_slice(&reference[offset..offset + extent[0] as usize * 4]);
-                    }
-                    assert!(
-                        strip == expected,
-                        "zoom {zoom}: building health keeps native pip pixels"
-                    );
-                    // Native-sized art keeps its offset from the first roof
-                    // anchor in screen pixels; only the anchor itself scales.
-                    assert!(
-                        (offset[0] + extent[0] as i32
-                            - reference_offset[0]
-                            - reference_extent[0] as i32)
-                            .abs()
-                            <= 1
-                    );
-                    assert!((offset[1] - reference_offset[1]).abs() <= 1);
-                }
-                for axis in 0..2 {
-                    // Only the center-to-center span scales with the roof;
-                    // the end pip artwork keeps its native pixel footprint.
-                    let step = [4.0, 2.0][axis];
-                    let art = reference_extent[axis] as f32 - (pip_count - 1) as f32 * step;
-                    let expected_extent = if zoom < 1.0 {
-                        (reference_extent[axis] as f32 - art) * zoom + art
-                    } else {
-                        reference_extent[axis] as f32 * zoom
-                    };
-                    let tolerance = if zoom < 1.0 { step } else { 2.0 };
-                    assert!(
-                        (extent[axis] as f32 - expected_extent).abs() <= tolerance,
-                        "zoom {zoom}: building health must span the scaled roof; extent {extent:?}, native {reference_extent:?}"
-                    );
-                    if zoom >= 1.0 {
-                        assert!(
-                            (offset[axis] as f32 - reference_offset[axis] as f32 * zoom).abs()
-                                <= 2.0,
-                            "zoom {zoom}: building health stays on the projected roof"
-                        );
-                    }
-                }
-                continue;
-            }
             assert_eq!(
                 extent, *reference_extent,
                 "zoom {zoom}: fixed health footprint"

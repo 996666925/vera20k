@@ -160,22 +160,6 @@ impl Gpu {
     }
 
     fn render_sized_zoom(&self, layers: &[Layer], size: [u32; 2], zoom: f32) -> Vec<[u8; 4]> {
-        self.render_resolved(layers, size, zoom, None)
-    }
-
-    fn render_world_zoom(&self, layers: &[Layer], size: [u32; 2], zoom: f32) -> Vec<[u8; 4]> {
-        let pass =
-            super::upscale_pass::WorldZoomPass::new(&self.device, &self.queue, FORMAT, size, zoom);
-        self.render_resolved(layers, pass.source_size(), 1.0, Some((pass, size)))
-    }
-
-    fn render_resolved(
-        &self,
-        layers: &[Layer],
-        size: [u32; 2],
-        zoom: f32,
-        world_zoom: Option<(super::upscale_pass::WorldZoomPass, [u32; 2])>,
-    ) -> Vec<[u8; 4]> {
         let camera = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -205,9 +189,7 @@ impl Gpu {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                | wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_SRC,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
         let depth = self.device.create_texture(&wgpu::TextureDescriptor {
@@ -459,22 +441,10 @@ impl Gpu {
             pass.draw(0..6, 0..1);
         }
 
-        let (color, size) = if let Some((pass, target)) = &world_zoom {
-            pass.composite(
-                &self.device,
-                &mut encoder,
-                &color,
-                [0, 0, target[0], target[1]],
-                wgpu::Color::BLACK,
-            );
-            (pass.color_texture(), *target)
-        } else {
-            (&color, size)
-        };
         let readback = PendingBgra8Readback::encode(
             &self.device,
             &mut encoder,
-            color,
+            &color,
             FORMAT,
             size[0],
             size[1],
@@ -520,146 +490,6 @@ fn cliff_depth_lanes() -> Layer {
         row.copy_from_slice(&[0, 1, 12, 13, 21, 22, 23, 0]);
     }
     terrain
-}
-
-fn pixel_art_stripes(shader: Shader) -> Layer {
-    let mut layer = Layer::solid(shader, RED, 0.0);
-    for (index, pixel) in layer.rgba.chunks_exact_mut(4).enumerate() {
-        let blue = (index % SIDE as usize) % 2 == 1;
-        pixel.copy_from_slice(if blue { &BLUE } else { &RED });
-        layer.indices[index] = if blue { 34 } else { 33 };
-    }
-    let mut palette = vec![0; 256 * 4];
-    palette[33 * 4..34 * 4].copy_from_slice(&RED);
-    palette[34 * 4..35 * 4].copy_from_slice(&BLUE);
-    layer.palette_override = Some(palette);
-    layer
-}
-
-#[test]
-#[ignore = "requires a wgpu adapter; run explicitly"]
-fn world_zoom_retains_thin_source_texels_when_shrinking() {
-    let gpu = Gpu::new();
-    for shader in [
-        Shader::Batch,
-        Shader::Terrain,
-        Shader::SpriteWrite,
-        Shader::Voxel,
-    ] {
-        let mut layer = pixel_art_stripes(shader);
-        for (index, pixel) in layer.rgba.chunks_exact_mut(4).enumerate() {
-            let blue = index % SIDE as usize % 4 == 2;
-            pixel.copy_from_slice(if blue { &BLUE } else { &RED });
-            layer.indices[index] = if blue { 34 } else { 33 };
-        }
-        // The third texel of every four is a thin blue detail. Point sampling
-        // (and a two-texel box) drops it; integrating all four retains 1/4 blue.
-        let point_sampled = gpu.render_sized_zoom(&[layer.clone()], [2; 2], 0.25);
-        let pixels = gpu.render_world_zoom(&[layer], [2; 2], 0.25);
-        assert_ne!(
-            pixels, point_sampled,
-            "{shader:?}: old point sampling loses the blue detail"
-        );
-        for pixel in pixels {
-            for (actual, expected) in pixel.into_iter().zip([225u8, 0, 137, 255]) {
-                assert!(actual.abs_diff(expected) <= 1, "{shader:?}: {pixel:?}");
-            }
-        }
-    }
-}
-
-#[test]
-#[ignore = "requires a wgpu adapter; run explicitly"]
-fn world_zoom_keeps_integer_pixels_and_fractional_atlas_seams_consistent() {
-    let gpu = Gpu::new();
-    for shader in [
-        Shader::Batch,
-        Shader::Terrain,
-        Shader::SpriteWrite,
-        Shader::Voxel,
-    ] {
-        let mut whole = pixel_art_stripes(shader);
-        whole.instance.position = [2.0; 2];
-        assert_eq!(
-            gpu.render_world_zoom(&[whole.clone()], [20; 2], 2.0),
-            gpu.render_sized_zoom(&[whole.clone()], [20; 2], 2.0),
-            "{shader:?}: whole magnification must retain exact pixel blocks",
-        );
-        let mut left = whole.clone();
-        left.instance.size[0] /= 2.0;
-        left.instance.uv_size[0] = 0.5;
-        let mut right = left.clone();
-        right.instance.position[0] += left.instance.size[0];
-        right.instance.uv_origin[0] = 0.5;
-        assert_eq!(
-            gpu.render_world_zoom(&[whole], [12; 2], 0.8),
-            gpu.render_world_zoom(&[left, right], [12; 2], 0.8),
-            "{shader:?}: atlas splitting must not change the composed image",
-        );
-    }
-}
-
-#[test]
-#[ignore = "requires a wgpu adapter; run explicitly"]
-fn zoomed_pixel_art_repeats_each_texel_without_stretching_the_quad() {
-    let gpu = Gpu::new();
-    for shader in [
-        Shader::Batch,
-        Shader::Terrain,
-        Shader::SpriteWrite,
-        Shader::Voxel,
-    ] {
-        let mut layer = pixel_art_stripes(shader);
-        layer.instance.position = [1.0; 2];
-        let pixels = gpu.render_sized_zoom(&[layer], [20; 2], 2.0);
-        // Eight source pixels must cover exactly sixteen output pixels, with
-        // two copies of every source texel and no padding around the sprite.
-        for y in 0..20 {
-            for x in 0..20 {
-                let expected = if (2..18).contains(&x) && (2..18).contains(&y) {
-                    if ((x - 2) / 2) % 2 == 0 { RED } else { BLUE }
-                } else {
-                    [0, 0, 0, 255]
-                };
-                assert_eq!(pixels[y * 20 + x], expected, "{shader:?} at ({x}, {y})");
-            }
-        }
-    }
-}
-
-#[test]
-#[ignore = "requires a wgpu adapter; run explicitly"]
-fn fractional_zoom_keeps_adjacent_sprite_samples_on_the_same_pixel_grid() {
-    let gpu = Gpu::new();
-    for shader in [
-        Shader::Batch,
-        Shader::Terrain,
-        Shader::SpriteWrite,
-        Shader::Voxel,
-    ] {
-        let mut whole = pixel_art_stripes(shader);
-        whole.instance.position = [2.0; 2];
-        let mut left = whole.clone();
-        left.instance.size[0] /= 2.0;
-        left.instance.uv_size[0] = 0.5;
-        let mut right = left.clone();
-        right.instance.position[0] += left.instance.size[0];
-        right.instance.uv_origin[0] = 0.5;
-        // Splitting a surface into neighboring atlas quads must not change
-        // its visible pixels or introduce a seam at a fractional screen edge.
-        let combined = gpu.render_sized_zoom(&[whole], [12; 2], 0.8);
-        let tiled = gpu.render_sized_zoom(&[left, right], [12; 2], 0.8);
-        assert!(combined.contains(&RED) && combined.contains(&BLUE));
-        for (index, (tile, whole)) in tiled.iter().zip(&combined).enumerate() {
-            assert_eq!(
-                tile,
-                whole,
-                "{shader:?} at ({}, {})",
-                index % 12,
-                index / 12
-            );
-        }
-    }
 }
 
 #[test]

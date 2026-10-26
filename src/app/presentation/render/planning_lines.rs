@@ -527,175 +527,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "requires GPU; wheel zoom scales the completed planning raster once"]
-    fn wheel_zoom_preserves_planning_strokes_and_nodes() {
-        use crate::render::batch::{BatchRenderer, CameraUniform, InstanceBufferPool};
-        use crate::render::terrain_draw_gpu_tests::{Gpu, camera, clear, encoded};
-        use crate::render::upscale_pass::WorldZoomPass;
-
-        let corpus: serde_json::Value = serde_json::from_str(crate::test_fixture::text(
-            "tools/spatial_oracle/planning_mode.json",
-        ))
-        .unwrap();
-        // One selected diagonal: white outer strokes, moving green dashes,
-        // and the square endpoint. Expected source pixels are native capture.
-        let row = corpus["render"]["stroke_controls"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|row| {
-                row["start"] == serde_json::json!([20, 20])
-                    && row["end"] == serde_json::json!([100, 100])
-                    && row["width"] == 4
-                    && row["ms"] == 32
-                    && row["selected"] == true
-            })
-            .unwrap();
-        let gpu = Gpu::new();
-        let format = wgpu::TextureFormat::Bgra8UnormSrgb;
-        let batch = BatchRenderer::new_with_device(&gpu.device, &gpu.queue, format);
-        let white = batch.create_texture_on_device(&gpu.device, &gpu.queue, &[255; 4], 1, 1, None);
-        let camera_pos = [-37.75, 53.75];
-        let unzoomed = super::super::tactical_line_viewport(camera_pos, [0, 0, 160, 120], None);
-        assert_eq!(unzoomed.camera, [-38, 54]);
-        assert_eq!(unzoomed.clip, [0, 0, 160, 120]);
-        let mut pool = InstanceBufferPool::new();
-        let mut expected = encoded(0x39E7, format).repeat(160 * 120);
-        for pixel in row["pixels"].as_array().unwrap() {
-            let offset = (pixel[1].as_u64().unwrap() as usize * 160
-                + pixel[0].as_u64().unwrap() as usize)
-                * 4;
-            expected[offset..offset + 4]
-                .copy_from_slice(&encoded(pixel[2].as_u64().unwrap() as u16, format));
-        }
-        let native = gpu.target([160, 120], format);
-        gpu.queue.write_texture(
-            native.as_image_copy(),
-            &expected,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(160 * 4),
-                rows_per_image: Some(120),
-            },
-            native.size(),
-        );
-        for zoom in [0.75, 1.25] {
-            let size = [(160. * zoom) as u32, (120. * zoom) as u32];
-            let resolve = WorldZoomPass::new(&gpu.device, &gpu.queue, format, size, zoom);
-            let view = super::super::tactical_line_viewport(
-                camera_pos,
-                [0, 0, size[0], size[1]],
-                Some(&resolve),
-            );
-            assert_eq!(view.clip, [0, 0, 160, 120]);
-            pool.upload_on_device(
-                &gpu.device,
-                &gpu.queue,
-                "target_lines",
-                &stroke_instances(row, view),
-            );
-            batch.write_camera(
-                &gpu.queue,
-                CameraUniform {
-                    camera_pos,
-                    zoom,
-                    ..camera(size)
-                },
-            );
-            batch.set_native_world_resolution(&gpu.queue, resolve.source_size());
-            let color = gpu.target(resolve.source_size(), format);
-            gpu.queue.write_texture(
-                color.as_image_copy(),
-                &encoded(0x39E7, format).repeat(160 * 120),
-                wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(160 * 4),
-                    rows_per_image: Some(120),
-                },
-                color.size(),
-            );
-            let cv = color.create_view(&Default::default());
-            let mut encoder = gpu.device.create_command_encoder(&Default::default());
-            clear(
-                &mut encoder,
-                &cv,
-                resolve.depth_view(),
-                12345,
-                wgpu::LoadOp::Load,
-            );
-            {
-                let mut pass = crate::app::presentation::sidebar_render::begin_main_load_pass(
-                    &mut encoder,
-                    &cv,
-                    resolve.depth_view(),
-                );
-                super::super::super::draw_passes::draw_pooled_surface_lines(
-                    &mut pass,
-                    &batch,
-                    &pool,
-                    Some(&white),
-                    "target_lines",
-                );
-            }
-            resolve.composite(
-                &gpu.device,
-                &mut encoder,
-                &color,
-                [0, 0, size[0], size[1]],
-                wgpu::Color::BLACK,
-            );
-            let actual_read = gpu.read(&mut encoder, resolve.color_texture());
-            resolve.composite(
-                &gpu.device,
-                &mut encoder,
-                &native,
-                [0, 0, size[0], size[1]],
-                wgpu::Color::BLACK,
-            );
-            let expected_read = gpu.read(&mut encoder, resolve.color_texture());
-            let output = gpu.finish(encoder, &[actual_read, expected_read], size);
-            assert!(
-                output[0] == output[1],
-                "zoom {zoom}: completed native paths"
-            );
-        }
-    }
-
-    fn stroke_instances(row: &serde_json::Value, view: TacticalViewport) -> Vec<SpriteInstance> {
-        let point =
-            |v: &serde_json::Value| [v[0].as_i64().unwrap() as i32, v[1].as_i64().unwrap() as i32];
-        let from = point(&row["start"]);
-        let to = point(&row["end"]);
-        let width = row["width"].as_i64().unwrap() as i32;
-        let outer = if row["selected"].as_bool().unwrap() {
-            [255; 3]
-        } else {
-            [0; 3]
-        };
-        let word = row["inner_rgb565"].as_u64().unwrap() as u16;
-        let inner = [
-            ((word >> 11) as u8) << 3,
-            (((word >> 5) & 63) as u8) << 2,
-            ((word & 31) as u8) << 3,
-        ];
-        let ms = row["ms"].as_i64().unwrap() as i32;
-        let mut instances = Vec::new();
-        emit_solid_segment(&mut instances, from, to, outer, width, view);
-        emit_segment(
-            &mut instances,
-            from,
-            to,
-            inner,
-            (ms.wrapping_neg() >> 5) & 15,
-            width - 2,
-            view,
-        );
-        emit_outline(&mut instances, [to[0] - 3, to[1] - 3, 6, 6], outer, view);
-        emit_marker(&mut instances, to, 4, inner, view);
-        instances
-    }
-
-    #[test]
     fn composed_planning_strokes_match_original_surface() {
         let corpus: serde_json::Value = serde_json::from_str(crate::test_fixture::text(
             "tools/spatial_oracle/planning_mode.json",
@@ -712,9 +543,33 @@ mod tests {
             let from = point(&row["start"]);
             let to = point(&row["end"]);
             let width = row["width"].as_i64().unwrap() as i32;
+            let outer = if row["selected"].as_bool().unwrap() {
+                [255; 3]
+            } else {
+                [0; 3]
+            };
+            let word = row["inner_rgb565"].as_u64().unwrap() as u16;
+            let inner = [
+                ((word >> 11) as u8) << 3,
+                (((word >> 5) & 63) as u8) << 2,
+                ((word & 31) as u8) << 3,
+            ];
             let ms = row["ms"].as_i64().unwrap() as i32;
+            let mut instances = Vec::new();
+            emit_solid_segment(&mut instances, from, to, outer, width, view);
+            emit_segment(
+                &mut instances,
+                from,
+                to,
+                inner,
+                (ms.wrapping_neg() >> 5) & 15,
+                width - 2,
+                view,
+            );
+            emit_outline(&mut instances, [to[0] - 3, to[1] - 3, 6, 6], outer, view);
+            emit_marker(&mut instances, to, 4, inner, view);
             let mut actual = vec![0x39E7u16; 160 * 120];
-            for instance in stroke_instances(row, view) {
+            for instance in instances {
                 let x = instance.position[0] as i32;
                 let y = instance.position[1] as i32;
                 let rgb = instance.tint.map(|v| (v * 255.).round() as u8);

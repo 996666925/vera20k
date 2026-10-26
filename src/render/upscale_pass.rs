@@ -30,6 +30,14 @@ pub(crate) struct WorldZoomPass {
     scale: f32,
 }
 
+/// The world target for `target` at `scale`: `ceil(target / scale)`, clamped
+/// to the device's 2D texture limit (the minimum-zoom clamp on a very wide
+/// window can otherwise round one texel past it).
+fn world_source_size(device: &wgpu::Device, target: [u32; 2], scale: f32) -> [u32; 2] {
+    let max = device.limits().max_texture_dimension_2d;
+    target.map(|v| ((v as f32 / scale).ceil().max(1.0) as u32).min(max))
+}
+
 impl WorldZoomPass {
     pub(crate) fn new(
         device: &wgpu::Device,
@@ -38,7 +46,7 @@ impl WorldZoomPass {
         target: [u32; 2],
         scale: f32,
     ) -> Self {
-        let source_size = target.map(|v| (v as f32 / scale).ceil().max(1.0) as u32);
+        let source_size = world_source_size(device, target, scale);
         let (_, world_depth) =
             create_depth_target(device, "Wheel zoom world", (source_size[0], source_size[1]));
         let surface = ScaledSurface::new(
@@ -64,7 +72,7 @@ impl WorldZoomPass {
         target: [u32; 2],
         scale: f32,
     ) {
-        let source_size = target.map(|v| (v as f32 / scale).ceil().max(1.0) as u32);
+        let source_size = world_source_size(device, target, scale);
         if source_size != self.source_size {
             let (_, depth) =
                 create_depth_target(device, "Wheel zoom world", (source_size[0], source_size[1]));

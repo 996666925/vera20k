@@ -78,8 +78,7 @@ Player preferences, keyboard shortcuts and lobby choices are saved in `VERA.INI`
 `config.toml` sets the game folder and can select another settings folder.
 
 Enable **Mouse Wheel Zoom** in **Vera Options**, or set `[VERA] MouseWheelZoom=yes`
-in `VERA.INI` (default `no`). Over the battlefield, zoom keeps the map point
-under the cursor in place; over the sidebar, the wheel scrolls the build list.
+in `VERA.INI` (default `no`).
 
 If `VERA.INI` is missing, VERA creates it and imports existing preferences once. With no
 old settings, it starts empty and VERA uses built-in defaults until settings are saved.
