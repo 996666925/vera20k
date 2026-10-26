@@ -1557,14 +1557,17 @@ impl ViewDistanceTier {
     }
 }
 
-/// Apply one mouse-wheel notch's view-distance step, anchored on the
-/// tactical viewport's centre so the battlefield grows or shrinks around it.
+/// Apply one mouse-wheel notch's view-distance step, anchored on the map
+/// point under the cursor when the notch arrives, including during an ease.
 /// A wheel-up notch (`lines > 0`) selects the smaller view distance.
-pub(crate) fn cycle_view_distance(state: &mut AppState, lines: f32) {
+pub(crate) fn cycle_view_distance(
+    input: &mut crate::app::input::state::MatchInputState,
+    lines: f32,
+) {
     if !lines.is_finite() || lines == 0.0 {
         return;
     }
-    let current = ViewDistanceTier::nearest(state.match_state.input.zoom_target);
+    let current = ViewDistanceTier::nearest(input.zoom_target);
     let next = if lines > 0.0 {
         current.smaller()
     } else {
@@ -1574,24 +1577,31 @@ pub(crate) fn cycle_view_distance(state: &mut AppState, lines: f32) {
         return;
     }
 
-    set_view_distance(state, next);
+    let anchor = [input.cursor_x, input.cursor_y];
+    set_view_distance(input, next, anchor);
 }
 
 /// Restore the stock tactical scale when the player turns wheel zoom off.
 pub(crate) fn reset_view_distance(state: &mut AppState) {
-    set_view_distance(state, ViewDistanceTier::Default);
+    let (width, height) = tactical_viewport_size(state);
+    set_view_distance(
+        &mut state.match_state.input,
+        ViewDistanceTier::Default,
+        [width as f32 / 2.0, height as f32 / 2.0],
+    );
 }
 
-fn set_view_distance(state: &mut AppState, tier: ViewDistanceTier) {
-    let (width, height) = tactical_viewport_size(state);
-    let anchor = [width as f32 / 2.0, height as f32 / 2.0];
-    let zoom = state.match_state.input.zoom_level;
-    state.match_state.input.zoom_anchor_world = [
-        anchor[0] / zoom + state.match_state.input.camera_x,
-        anchor[1] / zoom + state.match_state.input.camera_y,
+fn set_view_distance(
+    input: &mut crate::app::input::state::MatchInputState,
+    tier: ViewDistanceTier,
+    anchor: [f32; 2],
+) {
+    input.zoom_anchor_world = [
+        anchor[0] / input.zoom_level + input.camera_x,
+        anchor[1] / input.zoom_level + input.camera_y,
     ];
-    state.match_state.input.zoom_anchor_screen = anchor;
-    state.match_state.input.zoom_target = tier.zoom();
+    input.zoom_anchor_screen = anchor;
+    input.zoom_target = tier.zoom();
 }
 
 /// Whether the cursor is over the battlefield rather than the sidebar column

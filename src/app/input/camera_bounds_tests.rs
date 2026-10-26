@@ -2,6 +2,47 @@
 use super::*;
 
 #[test]
+fn wheel_zoom_anchors_on_the_cursor_and_reanchors_during_an_ease() {
+    let mut input = crate::app::input::state::MatchInputState::new(Default::default());
+    input.camera_x = 1000.0;
+    input.camera_y = 2000.0;
+    input.cursor_x = 288.0;
+    input.cursor_y = 480.0;
+    input.zoom_level = 0.8;
+    input.zoom_target = 0.8;
+
+    cycle_view_distance(&mut input, 1.0);
+    assert_eq!(input.zoom_target, 1.0);
+    assert_eq!(input.zoom_anchor_screen, [288.0, 480.0]);
+    assert_eq!(input.zoom_anchor_world, [1360.0, 2600.0]);
+
+    // A second notch sees a new cursor position and the CURRENT zoom/view,
+    // rather than reusing the previous anchor or the pending target scale.
+    input.zoom_level = 0.9;
+    input.camera_x = 1040.0;
+    input.camera_y = 2060.0;
+    input.cursor_x = 90.0;
+    input.cursor_y = 180.0;
+    cycle_view_distance(&mut input, -1.0);
+    assert_eq!(input.zoom_target, 0.8);
+    assert_eq!(input.zoom_anchor_screen, [90.0, 180.0]);
+    assert_eq!(input.zoom_anchor_world, [1140.0, 2260.0]);
+    assert_eq!((input.camera_x, input.camera_y), (1040.0, 2060.0));
+}
+
+#[test]
+fn wheel_zoom_at_a_tier_limit_keeps_the_active_anchor() {
+    let mut input = crate::app::input::state::MatchInputState::new(Default::default());
+    cycle_view_distance(&mut input, 1.0);
+    assert_eq!(input.zoom_target, ViewDistanceTier::Small.zoom());
+    let anchor = (input.zoom_anchor_screen, input.zoom_anchor_world);
+    input.cursor_x = 640.0;
+    input.cursor_y = 320.0;
+    cycle_view_distance(&mut input, 1.0);
+    assert_eq!((input.zoom_anchor_screen, input.zoom_anchor_world), anchor);
+}
+
+#[test]
 fn saved_zoom_respects_the_wheel_preference_without_moving_the_center_or_focus() {
     let viewport = (641, 481);
     let mut pending = PendingCameraScroll::default();
