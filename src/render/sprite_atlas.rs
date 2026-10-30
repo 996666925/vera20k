@@ -21,8 +21,8 @@
 //! - Part of render/ — depends on assets/ (SHP/Palette), render/batch (GPU upload).
 //! - Reads from sim/ via EntityStore iteration (GameEntity fields).
 
-use std::collections::{HashMap, HashSet};
 use crate::util::time::Instant;
+use std::collections::{HashMap, HashSet};
 
 use crate::assets::asset_manager::AssetManager;
 use crate::assets::mix_archive::SharedBytes;
@@ -2914,6 +2914,18 @@ fn load_shp_source(
                     .iter()
                     .flat_map(|load| load.shp_names(theater_ext, theater_name))
                     .collect()
+            } else if art.is_some_and(|art| {
+                art.iter_entries().any(|(_, entry)| {
+                    entry
+                        .bib_shape
+                        .as_deref()
+                        .is_some_and(|bib| bib.eq_ignore_ascii_case(base_type_id))
+                })
+            }) {
+                // BuildingTypeClass::LoadVisualAssets @ 0x0045F856..0x0045F922
+                // loads BibShape through 5F96B0, then 5F9710 on a miss. The
+                // raw bib name needs no ART entry or NewTheater flag of its own.
+                art_data::building_shp_names(base_type_id, theater_name).to_vec()
             } else {
                 art_data::object_shp_candidates(art, &image, theater_ext, theater_name)
             }

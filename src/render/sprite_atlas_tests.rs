@@ -826,6 +826,42 @@ fn building_body_without_new_theater_uses_theater_then_generic() {
     }
 }
 
+/// BuildingTypeClass::LoadVisualAssets @ 0x0045F856..0x0045F922 loads
+/// BibShape with the theater lookup even without a separate ART section.
+#[test]
+fn retail_yuri_factory_bib_uses_theater_then_generic() {
+    let Some(art_ini) = crate::rules::retail_ini_fixture::retail_ini("artmd.ini") else {
+        return;
+    };
+    let art = ArtRegistry::from_ini(&art_ini);
+    let bib = art.get("YAWEAP").unwrap().bib_shape.as_deref().unwrap();
+    assert_eq!(bib, "YAWEAPBB");
+    assert!(art.get(bib).is_none());
+    let directory = StoredFrameTestDirectory::new();
+    for name in ["YTWEAPBB.SHP", "YGWEAPBB.SHP", "YAWEAPBB.SHP"] {
+        directory.write_raw_and_rle_frames(name, [272, 242], [130, 160, 70, 40]);
+    }
+    let assets = AssetManager::from_loose_root_for_test(&directory.0);
+    for (theater, expected) in [
+        ("TEMPERATE", "YTWEAPBB.SHP"),
+        ("URBAN", "YGWEAPBB.SHP"),
+        ("SNOW", "YAWEAPBB.SHP"),
+    ] {
+        let source = load_shp_source(
+            &assets,
+            bib,
+            None,
+            "tem",
+            theater,
+            None,
+            Some(&art),
+            ShpImageKind::Object,
+        )
+        .expect("a declared bib loads without its own ART entry");
+        assert_eq!(source.found_name, expected);
+    }
+}
+
 #[test]
 fn building_body_lookup_uses_rules_image_theater_before_redirect() {
     let rules = building_body_atlas_rules(
